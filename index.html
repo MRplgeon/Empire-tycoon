@@ -146,8 +146,8 @@ function fmt(n){
 }
 
 // ============ SON ============
-let AC=null,
-  function getAC(){
+let AC=null;
+function getAC(){
   AC=AC||new (window.AudioContext||window.webkitAudioContext)();
   if(AC.state==="suspended")AC.resume();
   return AC;
