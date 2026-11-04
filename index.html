@@ -20,12 +20,31 @@ nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 .page.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 #cardWrap{display:flex;justify-content:center;margin:24px 0}
-#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s}
+#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s,background .6s}
 #card:active{transform:scale(.95)}
 #card .chip{position:absolute;left:22px;top:48px;width:44px;height:34px;border-radius:6px;background:linear-gradient(135deg,#e6c86e,#a8863a)}
 #card .num{position:absolute;left:22px;bottom:50px;letter-spacing:3px;font-size:17px;opacity:.85}
 #card .name{position:absolute;left:22px;bottom:22px;font-size:12px;opacity:.7;letter-spacing:2px}
 #card .logo{position:absolute;right:22px;top:20px;font-weight:700;letter-spacing:2px;opacity:.9}
+
+/* ===== DESIGNS DES SKINS ===== */
+#card.steel{border-radius:4px;background:repeating-linear-gradient(115deg,#ffffff10 0 2px,transparent 2px 8px),linear-gradient(135deg,var(--card1),var(--card2))}
+#card.steel::after{content:"";position:absolute;left:0;right:0;top:70px;height:22px;background:linear-gradient(90deg,#ffffff00,#ffffff55,#ffffff00);transform:skewY(-6deg);pointer-events:none}
+#card.gold{border-radius:12px;border:3px solid #f7e08a;background:radial-gradient(circle at 20% 20%,#ffffff22 0 1px,transparent 2px) 0 0/22px 22px,linear-gradient(135deg,var(--card1),var(--card2))}
+#card.gold .chip{box-shadow:inset 0 0 0 2px #fff6c0,0 2px 6px #0008}
+#card.platinum{border-radius:20px;background:repeating-conic-gradient(#ffffff0c 0 25%,transparent 0 50%) 0 0/16px 16px,linear-gradient(135deg,var(--card1),var(--card2))}
+#card.platinum::after{content:"";position:absolute;inset:0;border-radius:20px;background:linear-gradient(115deg,transparent 40%,#ffffff44 50%,transparent 60%);background-size:250% 100%;animation:sheen 3s infinite;pointer-events:none}
+@keyframes sheen{from{background-position:150% 0}to{background-position:-50% 0}}
+#card.black{border-radius:14px;border:2px solid #d4af37}
+#card.black .name,#card.black .logo{color:#d4af37;text-shadow:0 1px 0 #000,0 0 6px #d4af3766}
+#card.diamond{border-radius:18px;background:linear-gradient(135deg,#ffffff33 0%,transparent 35%),linear-gradient(225deg,#ffffff22 0%,transparent 40%),linear-gradient(135deg,var(--card1),var(--card2))}
+#card.diamond::after{content:"✦";position:absolute;right:18px;top:14px;color:#fff;font-size:18px;animation:twinkle 2s infinite;pointer-events:none}
+@keyframes twinkle{50%{opacity:.2}}
+#card.empire{border-radius:22px;border:2px solid #ffd6f5;animation:halo 2.5s ease-in-out infinite}
+#card.empire::before{content:"♛";position:absolute;right:16px;top:10px;font-size:26px;color:#ffd6f5;pointer-events:none}
+@keyframes halo{50%{box-shadow:0 0 45px #ff6ad5ff,0 10px 30px #0008}}
+/* ============================ */
+
 .float{position:fixed;pointer-events:none;font-weight:700;color:#7dff9a;font-size:20px;animation:up .9s forwards;z-index:99}
 .float.lucky{color:#ffd24a;font-size:26px}
 @keyframes up{to{transform:translateY(-70px);opacity:0}}
@@ -115,13 +134,13 @@ function t(k){return (TX[S.lang]&&TX[S.lang][k])||TX.en[k]||k}
 
 // ============ SKINS ============
 const SKINS=[
-{n:"STANDARD",at:0,c1:"#3a3a42",c2:"#6b6b75",a:"#9aa0a6",b1:"#1a1a1f",b2:"#2a2a33"},
-{n:"STEEL",at:25000,c1:"#4a5560",c2:"#9fb0c0",a:"#b8c7d6",b1:"#1a2028",b2:"#28323c"},
-{n:"GOLD",at:100000,c1:"#8a6a1a",c2:"#f0cf6a",a:"#f0cf6a",b1:"#22190a",b2:"#3a2c10"},
-{n:"PLATINUM",at:10000000,c1:"#7c8aa0",c2:"#e8eef8",a:"#e8eef8",b1:"#151a24",b2:"#262f40"},
-{n:"BLACK",at:1000000000,c1:"#050505",c2:"#2b2b2b",a:"#d4af37",b1:"#000",b2:"#111"},
-{n:"DIAMOND",at:100000000000,c1:"#3aa0c8",c2:"#d8f6ff",a:"#7fe4ff",b1:"#06202c",b2:"#0e3a4c"},
-{n:"EMPIRE",at:10000000000000,c1:"#5a1a7a",c2:"#ff6ad5",a:"#ff9be8",b1:"#1a0626",b2:"#33104a"}
+{n:"STANDARD",at:0,c1:"#3a3a42",c2:"#6b6b75",a:"#9aa0a6",b1:"#1a1a1f",b2:"#2a2a33",style:""},
+{n:"STEEL",at:25000,c1:"#4a5560",c2:"#9fb0c0",a:"#b8c7d6",b1:"#1a2028",b2:"#28323c",style:"steel"},
+{n:"GOLD",at:100000,c1:"#8a6a1a",c2:"#f0cf6a",a:"#f0cf6a",b1:"#22190a",b2:"#3a2c10",style:"gold"},
+{n:"PLATINUM",at:10000000,c1:"#7c8aa0",c2:"#e8eef8",a:"#e8eef8",b1:"#151a24",b2:"#262f40",style:"platinum"},
+{n:"BLACK",at:1000000000,c1:"#050505",c2:"#2b2b2b",a:"#d4af37",b1:"#000",b2:"#111",style:"black"},
+{n:"DIAMOND",at:100000000000,c1:"#3aa0c8",c2:"#d8f6ff",a:"#7fe4ff",b1:"#06202c",b2:"#0e3a4c",style:"diamond"},
+{n:"EMPIRE",at:10000000000000,c1:"#5a1a7a",c2:"#ff6ad5",a:"#ff9be8",b1:"#1a0626",b2:"#33104a",style:"empire"}
 ];
 // STANDARD (index 0) est toujours disponible ; les autres doivent être réclamés
 function skinClaimed(i){return i===0||!!S.claimed["skin"+i]}
@@ -131,6 +150,9 @@ function applySkin(){
   const s=SKINS[idx],r=document.documentElement.style;
   r.setProperty("--card1",s.c1);r.setProperty("--card2",s.c2);r.setProperty("--accent",s.a);
   r.setProperty("--bg1",s.b1);r.setProperty("--bg2",s.b2);
+  const card=document.getElementById("card");
+  card.className="";
+  if(s.style)card.classList.add(s.style);
   document.getElementById("cName").textContent=s.n;
 }
 function renderSkinSel(){
@@ -356,45 +378,4 @@ function resetGame(){
 }
 
 // ============ EVENTS ============
-document.getElementById("card").addEventListener("pointerdown",e=>{
-  let g=perClick(),lucky=false;
-  if(Math.random()<luckyChance()){g*=5;lucky=true}
-  addMoney(g);S.clicks++;click();
-  const f=document.createElement("div");f.className="float"+(lucky?" lucky":"");f.textContent="+"+fmt(g)+(lucky?" ★":"");
-  f.style.left=(e.clientX-20)+"px";f.style.top=(e.clientY-30)+"px";
-  document.body.appendChild(f);setTimeout(()=>f.remove(),900);
-  update();checkAch();
-});
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
-  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  document.getElementById(b.dataset.p).classList.add("active");
-  updateStickyHeader(b.dataset.p);
-});
-document.getElementById("claimAll").onclick=()=>{
-  ACH.forEach(a=>claim(a.id));renderAch();renderSkinSel();applySkin();update();
-};
-document.getElementById("langSel").onchange=e=>{S.lang=e.target.value;applyLang();save()};
-document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;updateMusicVol();save()};
-document.getElementById("musSel").onchange=e=>{
-  S.mus=+e.target.value;
-  if(S.mus)startMusic();
-  updateMusicVol();save();
-};
-document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
-document.getElementById("skinSel").onchange=e=>{
-  S.skinChoice=+e.target.value;applySkin();save();
-};
-document.getElementById("resetBtn").addEventListener("click",resetGame);
-
-// ============ LOOP ============
-setInterval(()=>{const ps=perSecond();if(ps>0){addMoney(ps);update()}checkAch()},1000);
-setInterval(save,10000);
-window.addEventListener("beforeunload",save);
-
-// ============ INIT ============
-applyLang();checkAch();updateStickyHeader("game");
-</script>
-</body>
-</html>
+document.getElementById("card").addEventList
