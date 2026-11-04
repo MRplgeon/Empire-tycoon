@@ -12,8 +12,9 @@ header{padding:14px;text-align:center;border-bottom:1px solid #ffffff22}
 #money{font-size:32px;font-weight:700;color:var(--accent);transition:color 1s}
 #info{font-size:13px;opacity:.7;margin-top:4px}
 nav{display:flex;border-bottom:1px solid #ffffff22}
-nav button{flex:1;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer}
+nav button{flex:1;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative}
 nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
+.badge{display:none;position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#e33;color:#fff;font-size:11px;font-weight:700;line-height:18px;padding:0 5px}
 .page{display:none;padding:14px;animation:fade .3s}
 .page.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -25,6 +26,7 @@ nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 #card .name{position:absolute;left:22px;bottom:22px;font-size:12px;opacity:.7;letter-spacing:2px}
 #card .logo{position:absolute;right:22px;top:20px;font-weight:700;letter-spacing:2px;opacity:.9}
 .float{position:fixed;pointer-events:none;font-weight:700;color:#7dff9a;font-size:20px;animation:up .9s forwards;z-index:99}
+.float.lucky{color:#ffd24a;font-size:26px}
 @keyframes up{to{transform:translateY(-70px);opacity:0}}
 .item{background:#ffffff0d;border:1px solid #ffffff1a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .item .t{font-weight:600}
@@ -33,8 +35,12 @@ nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 .item button:disabled{opacity:.35}
 .ach.done{border-color:#7dff9a88}
 .ach.done .t{color:#7dff9a}
+.ach.ready{border-color:#ffd24a;box-shadow:0 0 12px #ffd24a44}
+.ach.ready .t{color:#ffd24a}
+.claimAll{width:100%;margin-bottom:12px;background:#ffd24a;color:#111;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:15px;cursor:pointer}
 select,.btnr{background:#ffffff14;color:var(--text);border:1px solid #ffffff2a;border-radius:8px;padding:8px}
 .btnr{background:#a33;border:none;padding:10px 14px;font-weight:700}
+input[type=range]{width:140px;accent-color:var(--accent)}
 h3{margin:6px 0 12px}
 </style>
 </head>
@@ -46,7 +52,7 @@ h3{margin:6px 0 12px}
 </header>
 <nav>
 <button class="active" data-p="game" id="nGame">Card</button>
-<button data-p="ach" id="nAch">Achievements</button>
+<button data-p="ach" id="nAch"><span id="nAchT">Achievements</span><span class="badge" id="badge">0</span></button>
 <button data-p="set" id="nSet">Settings</button>
 </nav>
 
@@ -58,6 +64,7 @@ h3{margin:6px 0 12px}
 
 <div class="page" id="ach">
 <h3 id="hAch">Achievements</h3>
+<button class="claimAll" id="claimAll" style="display:none"></button>
 <div id="achList"></div>
 </div>
 
@@ -67,21 +74,33 @@ h3{margin:6px 0 12px}
 <select id="langSel"><option value="en">English</option><option value="fr">Français</option></select></div>
 <div class="item"><span id="lSnd">Sound</span>
 <select id="sndSel"><option value="1">On</option><option value="0">Off</option></select></div>
+<div class="item"><span id="lMus">Music</span>
+<select id="musSel"><option value="1">On</option><option value="0">Off</option></select></div>
+<div class="item"><span id="lVol">Music volume</span>
+<input type="range" id="volRange" min="0" max="100" step="1"></div>
 <div class="item"><span id="lRes">Reset game</span><button class="btnr" id="resetBtn">Reset</button></div>
 </div>
 <script>
 // ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,ups:{click:0,mult:0,auto:0},ach:{},skin:0};
+const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skin:0};
 let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
-for(const k in DEF){if(S[k]===undefined)S[k]=DEF[k]}
+for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
+for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
+// Migration : anciens succès déjà payés -> marqués comme réclamés
+if(!localStorage.getItem("empireTycoonV2")){
+  for(const id in S.ach){S.claimed[id]=1}
+  localStorage.setItem("empireTycoonV2","1");
+}
 function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 
 // ============ TEXTES ============
 const TX={
-en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",
-u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second"},
-fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",
-u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde"}
+en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",
+u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",
+u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
+fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",
+u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",
+u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
 };
 function t(k){return (TX[S.lang]&&TX[S.lang][k])||TX.en[k]||k}
 
@@ -106,12 +125,17 @@ function applySkin(){
 // ============ UPGRADES ============
 const UPS={
 click:{base:15,g:1.35,key:"u_click"},
-mult:{base:500,g:2.1,key:"u_mult"},
-auto:{base:60,g:1.4,key:"u_auto"}
+auto:{base:60,g:1.4,key:"u_auto"},
+tap:{base:400,g:1.45,key:"u_tap"},
+mult:{base:900,g:2.1,key:"u_mult"},
+lucky:{base:2500,g:1.6,key:"u_lucky",max:25},
+net:{base:3500,g:1.5,key:"u_net"}
 };
 function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
-function perClick(){return (1+S.ups.click)*Math.pow(1.25,S.ups.mult)*(1+S.gems*0)}
-function perSecond(){return S.ups.auto}
+function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
+function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.25,S.ups.mult)}
+function perSecond(){return S.ups.auto+10*S.ups.net}
+function luckyChance(){return Math.min(0.5,S.ups.lucky*0.02)}
 
 // ============ FORMAT ============
 function fmt(n){
@@ -122,18 +146,61 @@ function fmt(n){
 }
 
 // ============ SON ============
-let AC=null;
+let AC=null,musicStarted=false,musicGain=null,musicTimer=null;
+function getAC(){
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==="suspended")AC.resume();
+  return AC;
+}
 function click(){
   if(!S.snd)return;
   try{
-    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-    const o=AC.createOscillator(),g=AC.createGain();
+    const a=getAC();
+    const o=a.createOscillator(),g=a.createGain();
     o.frequency.value=520+Math.random()*60;o.type="triangle";
-    g.gain.setValueAtTime(.06,AC.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.08);
-    o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.08);
+    g.gain.setValueAtTime(.06,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
+    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
   }catch(e){}
 }
+// Musique d'ambiance douce générée (accords lents)
+const CHORDS=[[220,277.18,329.63],[196,246.94,293.66],[174.61,220,261.63],[196,246.94,329.63]];
+let chordIdx=0;
+function musicVol(){return S.mus?(S.vol/100)*0.12:0}
+function playChord(){
+  if(!S.mus||!AC)return;
+  try{
+    const a=AC,now=a.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
+    ch.forEach((f,i)=>{
+      const o=a.createOscillator(),g=a.createGain();
+      o.type="sine";o.frequency.value=f;
+      o.detune.value=(i-1)*4;
+      g.gain.setValueAtTime(0,now);
+      g.gain.linearRampToValueAtTime(0.5,now+2);
+      g.gain.linearRampToValueAtTime(0,now+6);
+      o.connect(g);g.connect(musicGain);
+      o.start(now);o.stop(now+6.2);
+    });
+  }catch(e){}
+}
+function startMusic(){
+  if(musicStarted)return;
+  try{
+    const a=getAC();
+    musicGain=a.createGain();
+    musicGain.gain.value=musicVol();
+    musicGain.connect(a.destination);
+    musicStarted=true;
+    playChord();
+    musicTimer=setInterval(playChord,4000);
+  }catch(e){}
+}
+function updateMusicVol(){
+  if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
+}
+// Démarre au premier toucher (exigé par les navigateurs)
+["pointerdown","touchstart","keydown"].forEach(ev=>
+  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{once:false,passive:true}));
 
 // ============ ACHIEVEMENTS ============
 const ACH=[];
@@ -146,24 +213,53 @@ const ACH=[];
 [5,15].forEach(v=>
   ACH.push({id:"ua"+v,en:"Auto Payments level "+v,fr:"Paiements auto niv "+v,gem:2,test:()=>S.ups.auto>=v}));
 ACH.push({id:"um5",en:"Gold Swipe level 5",fr:"Glissade dorée niv 5",gem:3,test:()=>S.ups.mult>=5});
+[5,15].forEach(v=>
+  ACH.push({id:"ut"+v,en:"Contactless level "+v,fr:"Sans contact niv "+v,gem:2,test:()=>S.ups.tap>=v}));
+ACH.push({id:"ul10",en:"Lucky Tap level 10",fr:"Clic chanceux niv 10",gem:3,test:()=>S.ups.lucky>=10});
+ACH.push({id:"un5",en:"Premium Network level 5",fr:"Réseau premium niv 5",gem:3,test:()=>S.ups.net>=5});
+
+function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
 function checkAch(){
   let ch=false;
-  ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;S.gems+=a.gem;ch=true}});
-  if(ch){renderAch();update()}
+  ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;ch=true}});
+  if(ch){renderAch()}
+  updateBadge();
+}
+function updateBadge(){
+  const n=readyCount(),b=document.getElementById("badge");
+  b.style.display=n>0?"block":"none";b.textContent=n;
+}
+function claim(id){
+  const a=ACH.find(x=>x.id===id);
+  if(a&&S.ach[id]&&!S.claimed[id]){S.claimed[id]=1;S.gems+=a.gem;click();save()}
 }
 function renderAch(){
-  document.getElementById("achList").innerHTML=ACH.map(a=>
-    '<div class="item ach '+(S.ach[a.id]?"done":"")+'"><div><div class="t">'+(S.lang==="fr"?a.fr:a.en)+'</div></div><div>'+(S.ach[a.id]?"✔ ":"")+'+'+a.gem+' 💎</div></div>').join("");
+  const n=readyCount(),ca=document.getElementById("claimAll");
+  ca.style.display=n>0?"block":"none";
+  ca.textContent=t("claimall")+" ("+n+")";
+  // prêts d'abord, puis non débloqués, puis réclamés
+  const order=a=>S.ach[a.id]&&!S.claimed[a.id]?0:(!S.ach[a.id]?1:2);
+  const list=ACH.map((a,i)=>({a,i})).sort((x,y)=>order(x.a)-order(y.a)||x.i-y.i).map(o=>o.a);
+  document.getElementById("achList").innerHTML=list.map(a=>{
+    const name=S.lang==="fr"?a.fr:a.en;
+    const ready=S.ach[a.id]&&!S.claimed[a.id],done=S.claimed[a.id];
+    return '<div class="item ach '+(done?"done":"")+(ready?" ready":"")+'"><div><div class="t">'+name+'</div></div><div>'+
+      (ready?'<button data-c="'+a.id+'">'+t("claim")+' +'+a.gem+' 💎</button>':(done?"✔ ":"")+'+'+a.gem+' 💎')+'</div></div>';
+  }).join("");
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{claim(b.dataset.c);renderAch();update()});
+  updateBadge();
 }
 
 // ============ UI ============
 function addMoney(n){S.money+=n;S.total+=n}
 function renderUps(){
-  document.getElementById("ups").innerHTML=Object.keys(UPS).map(k=>
-    '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(S.money<cost(k)?"disabled":"")+'>'+fmt(cost(k))+'</button></div>').join("");
+  document.getElementById("ups").innerHTML=Object.keys(UPS).map(k=>{
+    const mx=isMax(k);
+    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
+  }).join("");
   document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
     const k=b.dataset.u,c=cost(k);
-    if(S.money>=c){S.money-=c;S.ups[k]++;click();update();checkAch();save()}
+    if(!isMax(k)&&S.money>=c){S.money-=c;S.ups[k]++;click();update();checkAch();save()}
   });
 }
 function update(){
@@ -174,23 +270,31 @@ function update(){
 }
 function applyLang(){
   document.getElementById("nGame").textContent=t("card");
-  document.getElementById("nAch").textContent=t("ach");
+  document.getElementById("nAchT").textContent=t("ach");
   document.getElementById("nSet").textContent=t("set");
   document.getElementById("hUp").textContent=t("up");
   document.getElementById("hAch").textContent=t("ach");
   document.getElementById("hSet").textContent=t("set");
   document.getElementById("lLang").textContent=t("lang");
   document.getElementById("lSnd").textContent=t("snd");
+  document.getElementById("lMus").textContent=t("mus");
+  document.getElementById("lVol").textContent=t("vol");
   document.getElementById("lRes").textContent=t("res");
+  const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
+  so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
   document.getElementById("langSel").value=S.lang;
   document.getElementById("sndSel").value=S.snd;
+  document.getElementById("musSel").value=S.mus;
+  document.getElementById("volRange").value=S.vol;
   renderAch();update();
 }
 
 // ============ EVENTS ============
 document.getElementById("card").addEventListener("pointerdown",e=>{
-  const g=perClick();addMoney(g);S.clicks++;click();
-  const f=document.createElement("div");f.className="float";f.textContent="+"+fmt(g);
+  let g=perClick(),lucky=false;
+  if(Math.random()<luckyChance()){g*=5;lucky=true}
+  addMoney(g);S.clicks++;click();
+  const f=document.createElement("div");f.className="float"+(lucky?" lucky":"");f.textContent="+"+fmt(g)+(lucky?" ★":"");
   f.style.left=(e.clientX-20)+"px";f.style.top=(e.clientY-30)+"px";
   document.body.appendChild(f);setTimeout(()=>f.remove(),900);
   update();checkAch();
@@ -200,10 +304,19 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
   b.classList.add("active");document.getElementById(b.dataset.p).classList.add("active");
 });
+document.getElementById("claimAll").onclick=()=>{
+  ACH.forEach(a=>claim(a.id));renderAch();update();
+};
 document.getElementById("langSel").onchange=e=>{S.lang=e.target.value;applyLang();save()};
 document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;save()};
+document.getElementById("musSel").onchange=e=>{
+  S.mus=+e.target.value;
+  if(S.mus){startMusic();}
+  updateMusicVol();save();
+};
+document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
 document.getElementById("resetBtn").onclick=()=>{
-  if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");location.reload()}
+  if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");localStorage.removeItem("empireTycoonV2");location.reload()}
 };
 
 // ============ LOOP ============
