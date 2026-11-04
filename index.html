@@ -301,7 +301,16 @@ function updateBadge(){
 }
 function claim(id){
   const a=ACH.find(x=>x.id===id);
-  if(a&&S.ach[id]&&!S.claimed[id]){S.claimed[id]=1;S.gems+=a.gem;click();save()}
+  if(a&&S.ach[id]&&!S.claimed[id]){
+    S.claimed[id]=1;
+    S.gems+=a.gem;
+    // Si c'est un skin, on l'équipe directement
+    if(id.startsWith("skin")){
+      S.skinChoice=parseInt(id.slice(4),10);
+    }
+    click();
+    save();
+  }
 }
 function renderAch(){
   const n=readyCount(),ca=document.getElementById("claimAll");
