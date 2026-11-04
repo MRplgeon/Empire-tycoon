@@ -382,4 +382,66 @@ function updateStickyHeader(page){
 function resetGame(){
   if(!window.confirm(t("confirm")))return;
   resetting=true;
-  clearInter
+  clearInterval(saveTimer);
+  Object.keys(localStorage)
+    .filter(k=>k.startsWith("empireTycoon"))
+    .forEach(k=>localStorage.removeItem(k));
+  location.reload();
+}
+
+// ============ EVENTS ============
+document.getElementById("card").addEventListener("pointerdown",e=>{
+  let g=perClick(),lucky=false;
+  if(Math.random()<luckyChance()){g*=5;lucky=true}
+  addMoney(g);S.clicks++;click();
+  const f=document.createElement("div");
+  f.className="float"+(lucky?" lucky":"");
+  f.textContent="+"+fmt(g)+(lucky?" ★":"");
+  f.style.left=(e.clientX-20)+"px";
+  f.style.top=(e.clientY-30)+"px";
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),900);
+  update();checkAch();
+});
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById(b.dataset.p).classList.add("active");
+  updateStickyHeader(b.dataset.p);
+});
+
+document.getElementById("claimAll").onclick=()=>{
+  ACH.forEach(a=>claim(a.id));
+  renderAch();renderSkinSel();applySkin();update();
+};
+
+document.getElementById("langSel").onchange=e=>{S.lang=e.target.value;applyLang();save()};
+document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;updateMusicVol();save()};
+document.getElementById("musSel").onchange=e=>{
+  S.mus=+e.target.value;
+  if(S.mus)startMusic();
+  updateMusicVol();save();
+};
+document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
+document.getElementById("skinSel").onchange=e=>{
+  S.skinChoice=+e.target.value;applySkin();save();
+};
+document.getElementById("resetBtn").addEventListener("click",resetGame);
+// ============ LOOP ============
+setInterval(()=>{
+  const ps=perSecond();
+  if(ps>0){addMoney(ps);update()}
+  checkAch();
+},1000);
+const saveTimer=setInterval(save,10000);
+window.addEventListener("beforeunload",save);
+
+// ============ INIT ============
+applyLang();
+checkAch();
+updateStickyHeader("game");
+</script>
+</body>
+</html>
