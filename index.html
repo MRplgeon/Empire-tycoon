@@ -14,17 +14,18 @@ body.on-card header{position:sticky;top:0}
 #info{font-size:13px;opacity:.7;margin-top:4px}
 nav{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #ffffff22}
 nav::-webkit-scrollbar{display:none}
-nav button{flex:0 0 auto;min-width:33%;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative;white-space:nowrap}
+nav button{flex:0 0 auto;min-width:25%;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative;white-space:nowrap}
 nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 .badge{display:none;position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#e33;color:#fff;font-size:11px;font-weight:700;line-height:18px;padding:0 5px}
 .page{display:none;padding:14px;animation:fade .3s}
 .page.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 #cardWrap{display:flex;justify-content:center;margin:24px 0}
-#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s}
+#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s,background .6s;overflow:hidden}
 #card:active{transform:scale(.97)}
-#card::before{content:"";position:absolute;left:20px;top:50px;width:44px;height:32px;border-radius:6px;background:linear-gradient(135deg,#e6c36a,#a8842f)}
-#card .num{position:absolute;bottom:18px;left:20px;font-size:14px;letter-spacing:3px;opacity:.7}
+#card::before{content:"";position:absolute;left:20px;top:50px;width:44px;height:32px;border-radius:6px;background:linear-gradient(135deg,#e6c36a,#a8842f);z-index:2}
+#card .num{position:absolute;bottom:18px;left:20px;font-size:14px;letter-spacing:3px;opacity:.7;z-index:2}
+#card .pattern{position:absolute;inset:0;pointer-events:none;z-index:1}
 .float{position:fixed;pointer-events:none;font-weight:700;color:#fff;animation:up .9s forwards;z-index:99}
 .float.lucky{color:#ffd54a;font-size:20px}
 @keyframes up{to{transform:translateY(-70px);opacity:0}}
@@ -45,6 +46,13 @@ select option{background:#2a2a33;color:var(--text)}
 .comp-card .d{font-size:12px;opacity:.65}
 .sec{font-size:13px;opacity:.7;margin:12px 0 6px}
 .back{background:none;color:var(--text);border:1px solid #ffffff33;margin-bottom:12px}
+.bar{height:6px;border-radius:3px;background:#ffffff1a;overflow:hidden;margin-top:4px}
+.bar>div{height:100%;background:var(--accent)}
+.sortBtn{background:#ffffff14;color:var(--text);font-size:12px;padding:6px 10px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.blockCard{background:#ffffff0d;border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;font-size:18px;font-weight:700}
+.blockCard small{display:block;font-size:12px;opacity:.6;font-weight:400;margin-top:4px}
+.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ffffff14;font-size:14px}
 </style>
 </head>
 <body>
@@ -56,12 +64,14 @@ select option{background:#2a2a33;color:var(--text)}
 <nav>
   <button data-p="comp" id="nComp">Companies</button>
   <button data-p="game" class="active" id="nGame">Card</button>
+  <button data-p="goods" id="nGoods">Assets</button>
   <button data-p="ach" id="nAchT"><span id="hAch">Achievements</span><span class="badge" id="badge">0</span></button>
+  <button data-p="profile" id="nProf">Profile</button>
   <button data-p="set" id="nSet">Settings</button>
 </nav>
 
 <div class="page active" id="game">
-  <div id="cardWrap"><div id="card"><div class="num">•••• •••• •••• 0000</div></div></div>
+  <div id="cardWrap"><div id="card"><div class="pattern" id="pattern"></div><div class="num">•••• •••• •••• 0000</div></div></div>
   <div class="sec" id="hUp">Upgrades</div>
   <div id="upsList"></div>
 </div>
@@ -70,9 +80,17 @@ select option{background:#2a2a33;color:var(--text)}
   <div id="compList"></div>
 </div>
 
+<div class="page" id="goods">
+  <div id="goodsRoot"></div>
+</div>
+
 <div class="page" id="ach">
   <button id="claimAll"></button>
   <div id="achList"></div>
+</div>
+
+<div class="page" id="profile">
+  <div id="profList"></div>
 </div>
 
 <div class="page" id="set">
@@ -90,38 +108,66 @@ select option{background:#2a2a33;color:var(--text)}
 </div>
 <script>
 // ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,tap:0,lucky:0},ach:{},claimed:{},skinChoice:0,companies:{},compLevels:{}};
+const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,
+  ups:{click:0,mult:0,tap:0,lucky:0},ach:{},claimed:{},skinChoice:0,
+  companies:{},compLevels:{},
+  re:{},            // real estate : id -> nb possédés
+  reLv:{},          // real estate upgrades : id -> {k:lvl}
+  veh:{},           // véhicules : id -> nb possédés
+  stats:{byCard:0,byComp:0,byRe:0,byVeh:0,bought:0,compBought:0,reBought:0,vehBought:0},
+  reSort:"asc"
+};
 let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
 for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
+for(const k in DEF.stats){if(S.stats[k]===undefined)S.stats[k]=0}
 function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 
 // ============ TEXTES ============
 const TX={
-en:{card:"Card",comp:"Companies",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound effects",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset progress",confirm:"WARNING: This will PERMANENTLY erase ALL your progress (money, upgrades, achievements, skins, gems, companies and settings).\n\nClick OK to reset EVERYTHING. This cannot be undone.\n\nClick Cancel to keep your progress.",perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",buy:"Buy",sell:"Sell",merge:"Merge",owned:"Owned",back:"← Back",price:"Price",income:"Income",upgrades:"Upgrades",
-u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.1 click gain (max 10)",u_tap:"Contactless",u_tapd:"+$5 per click (max 30)",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click (max 25)"},
-fr:{card:"Carte",comp:"Entreprises",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Effets sonores",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser la progression",confirm:"ATTENTION : Cela va effacer DÉFINITIVEMENT toute ta progression (argent, améliorations, succès, skins, gemmes, entreprises et paramètres).\n\nClique sur OK pour TOUT réinitialiser. Cette action est irréversible.\n\nClique sur Annuler pour garder ta progression.",perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",buy:"Acheter",sell:"Vendre",merge:"Fusionner",owned:"Possédées",back:"← Retour",price:"Prix",income:"Revenu",upgrades:"Améliorations",
-u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,1 gain par clic (max 10)",u_tap:"Sans contact",u_tapd:"+5$ par clic (max 30)",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5 (max 25)"}
+en:{card:"Card",comp:"Companies",goods:"Assets",ach:"Achievements",prof:"Profile",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound effects",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset progress",
+confirm:"WARNING: This will PERMANENTLY erase ALL your progress (money, upgrades, achievements, skins, gems, companies, assets, profile and settings).\n\nClick OK to reset EVERYTHING. This cannot be undone.\n\nClick Cancel to keep your progress.",
+perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",buy:"Buy",merge:"Merge",owned:"Owned",back:"← Back",price:"Price",income:"Income",upgrades:"Upgrades",
+realestate:"Real estate",vehicles:"Vehicles",cars:"Cars",aircraft:"Aircraft",boats:"Boats",sortAsc:"Price ↑",sortDesc:"Price ↓",rent:"Rent",
+u_click:"Better Chip",u_clickd:"+$1 per click (max 50)",u_mult:"Gold Swipe",u_multd:"x1.1 click gain (max 10)",u_tap:"Contactless",u_tapd:"+$5 per click (max 30)",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click (max 25)",
+pTotal:"Total earned",pCard:"Card",pComp:"Companies",pRe:"Real estate",pVeh:"Vehicles",pOther:"Other",pShare:"of total",pBought:"Items bought",pCompB:"Companies bought",pReB:"Properties bought",pVehB:"Vehicles bought",pClicks:"Card clicks",pAch:"Achievements unlocked"},
+fr:{card:"Carte",comp:"Entreprises",goods:"Biens",ach:"Succès",prof:"Profil",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Effets sonores",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser la progression",
+confirm:"ATTENTION : Cela va effacer DÉFINITIVEMENT toute ta progression (argent, améliorations, succès, skins, gemmes, entreprises, biens, profil et paramètres).\n\nClique sur OK pour TOUT réinitialiser. Cette action est irréversible.\n\nClique sur Annuler pour garder ta progression.",
+perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",buy:"Acheter",merge:"Fusionner",owned:"Possédées",back:"← Retour",price:"Prix",income:"Revenu",upgrades:"Améliorations",
+realestate:"Immobilier",vehicles:"Véhicules",cars:"Voitures",aircraft:"Aéronefs",boats:"Bateaux",sortAsc:"Prix ↑",sortDesc:"Prix ↓",rent:"Loyer",
+u_click:"Meilleure puce",u_clickd:"+1$ par clic (max 50)",u_mult:"Glissade dorée",u_multd:"x1,1 gain par clic (max 10)",u_tap:"Sans contact",u_tapd:"+5$ par clic (max 30)",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5 (max 25)",
+pTotal:"Total gagné",pCard:"Carte",pComp:"Entreprises",pRe:"Immobilier",pVeh:"Véhicules",pOther:"Autre",pShare:"du total",pBought:"Achats",pCompB:"Entreprises achetées",pReB:"Biens immobiliers achetés",pVehB:"Véhicules achetés",pClicks:"Clics sur la carte",pAch:"Succès débloqués"}
 };
 function t(k){return (TX[S.lang]&&TX[S.lang][k])||TX.en[k]||k}
+function nm(o){return S.lang==="fr"?(o.fr||o.en):o.en}
 
-// ============ SKINS ============
+// ============ SKINS (motifs CSS) ============
 const SKINS=[
-  {n:"Basic",at:0,g1:"#3a3a42",g2:"#6b6b75",bg1:"#1a1a1f",bg2:"#2a2a33",acc:"#9aa0a6"},
-  {n:"Silver",at:25000,g1:"#d7dbe0",g2:"#7d848e",bg1:"#1c2129",bg2:"#2d3440",acc:"#cfd6df"},
-  {n:"Gold",at:250000,g1:"#f5d77a",g2:"#a7791c",bg1:"#2a2110",bg2:"#43341a",acc:"#f5d77a"},
-  {n:"Emerald",at:2500000,g1:"#46d69a",g2:"#106b4a",bg1:"#0c1f18",bg2:"#16352a",acc:"#6fe3b2"},
-  {n:"Sapphire",at:25000000,g1:"#4f8cff",g2:"#1a3f9a",bg1:"#0b1530",bg2:"#162650",acc:"#7fb0ff"},
-  {n:"Diamond",at:250000000,g1:"#e6f7ff",g2:"#7fb9d9",bg1:"#101a24",bg2:"#1d2e3d",acc:"#bfe9ff"}
+  {n:"Basic",at:0,g1:"#3a3a42",g2:"#6b6b75",bg1:"#1a1a1f",bg2:"#2a2a33",acc:"#9aa0a6",pat:"none"},
+  {n:"Silver",at:25000,g1:"#d7dbe0",g2:"#7d848e",bg1:"#1c2129",bg2:"#2d3440",acc:"#cfd6df",pat:"repeating-linear-gradient(45deg,#ffffff18 0 6px,transparent 6px 14px)"},
+  {n:"Gold",at:100000,g1:"#f5d77a",g2:"#a7791c",bg1:"#2a2110",bg2:"#43341a",acc:"#f5d77a",pat:"radial-gradient(circle at 80% 20%,#fff8d088,transparent 45%),repeating-radial-gradient(circle at 0 0,#ffffff12 0 2px,transparent 2px 10px)"},
+  {n:"Checker",at:1000000,g1:"#2b2b33",g2:"#55555f",bg1:"#15151a",bg2:"#22222b",acc:"#c0c4cc",pat:"conic-gradient(#ffffff14 25%,transparent 0 50%,#ffffff14 0 75%,transparent 0) 0 0/28px 28px"},
+  {n:"Emerald",at:100000000,g1:"#46d69a",g2:"#106b4a",bg1:"#0c1f18",bg2:"#16352a",acc:"#6fe3b2",pat:"radial-gradient(circle at 15% 85%,#b8ffe055,transparent 40%),repeating-linear-gradient(-30deg,#ffffff10 0 4px,transparent 4px 18px)"},
+  {n:"Sapphire",at:1000000000,g1:"#4f8cff",g2:"#1a3f9a",bg1:"#0b1530",bg2:"#162650",acc:"#7fb0ff",pat:"linear-gradient(120deg,transparent 30%,#ffffff33 45%,transparent 60%),repeating-linear-gradient(0deg,#ffffff0d 0 2px,transparent 2px 12px)"},
+  {n:"Carbon",at:10000000000,g1:"#1d1d1d",g2:"#4a4a4a",bg1:"#0a0a0a",bg2:"#1a1a1a",acc:"#bdbdbd",pat:"repeating-linear-gradient(45deg,#ffffff0c 0 3px,transparent 3px 6px),repeating-linear-gradient(-45deg,#ffffff0c 0 3px,transparent 3px 6px)"},
+  {n:"Aurora",at:100000000000,g1:"#7a3cff",g2:"#1fd1b8",bg1:"#120a24",bg2:"#1b1040",acc:"#b38bff",pat:"radial-gradient(ellipse at 30% 0%,#7dffe866,transparent 60%),radial-gradient(ellipse at 80% 100%,#ff7ad966,transparent 55%)"},
+  {n:"DIAMOND",at:1000000000000,g1:"#e6f7ff",g2:"#7fb9d9",bg1:"#101a24",bg2:"#1d2e3d",acc:"#bfe9ff",pat:"conic-gradient(from 45deg,#ffffff55,transparent 20%,#ffffff33 40%,transparent 60%,#ffffff55 80%,transparent)"},
+  {n:"Empire",at:10000000000000,g1:"#5a1a7a",g2:"#ff6ad5",bg1:"#1a0626",bg2:"#33104a",acc:"#ff9be8",pat:"radial-gradient(circle at 50% 120%,#ffd1f055,transparent 60%),repeating-linear-gradient(60deg,#ffffff12 0 2px,transparent 2px 16px)"}
 ];
-
+</script>
+<script>
 // ============ ENTREPRISES : DONNÉES ============
+// merge:{to:"id", need:N} => fusion possible seulement si défini
 const COMPANIES=[
   {id:"shop",icon:"🏪",en:"Corner Shop",fr:"Supérette",base:75000,g:1.15,rev:150,
+    merge:{to:"super",need:4},
     ups:[{k:"stock",en:"Stock shelves",fr:"Rayonnages",cost:40000,inc:300,max:5},
          {k:"cam",en:"Security cameras",fr:"Caméras",cost:60000,inc:450,max:3},
          {k:"ext",en:"Extended hours",fr:"Horaires étendus",cost:90000,inc:600,max:3}]},
-  {id:"taxi",icon:"🚕",en:"Taxi Company",fr:"Compagnie de taxi",base:900000,g:1.2,rev:1500,
+  {id:"super",icon:"🛒",en:"Supermarket",fr:"Supermarché",base:900000,g:1.2,rev:1400,
+    ups:[{k:"cash",en:"Extra checkouts",fr:"Caisses supplémentaires",cost:300000,inc:2000,max:6},
+         {k:"brand",en:"Own brand line",fr:"Marque propre",cost:500000,inc:3000,max:4}]},
+  {id:"taxi",icon:"🚕",en:"Taxi Company",fr:"Compagnie de taxi",base:2500000,g:1.2,rev:3000,
     ups:[{k:"veh",en:"Buy vehicles",fr:"Acheter des véhicules",cost:250000,inc:1800,max:10},
          {k:"drv",en:"Hire drivers",fr:"Embaucher des chauffeurs",cost:120000,inc:1200,max:10},
          {k:"zone",en:"Acquire city zones",fr:"Acquérir des secteurs",cost:600000,inc:4000,max:6}]},
@@ -131,9 +177,20 @@ const COMPANIES=[
   {id:"rental",icon:"🚗",en:"Car Rental",fr:"Loueur de voitures",base:20000000,g:1.22,rev:30000,
     ups:[{k:"fleet",en:"Expand fleet",fr:"Agrandir la flotte",cost:8000000,inc:45000,max:8},
          {k:"branch",en:"Open branches",fr:"Ouvrir des agences",cost:15000000,inc:70000,max:5}]},
+  {id:"hotel",icon:"🏨",en:"Hotel",fr:"Hôtel",base:50000000,g:1.24,rev:60000,
+    ups:[{k:"rooms",en:"Add rooms",fr:"Ajouter des chambres",cost:20000000,inc:90000,max:5},
+         {k:"spa",en:"Spa & restaurant",fr:"Spa & restaurant",cost:35000000,inc:120000,max:3}]},
+  {id:"museum",icon:"🏛️",en:"Museum",fr:"Musée",base:120000000,g:1.25,rev:100000,
+    ups:[{k:"exh",en:"New exhibitions",fr:"Nouvelles expositions",cost:50000000,inc:150000,max:5},
+         {k:"gift",en:"Gift shop",fr:"Boutique souvenirs",cost:30000000,inc:90000,max:3}],
+    vehSlots:true},
   {id:"bank",icon:"🏦",en:"Bank",fr:"Banque",base:250000000,g:1.25,rev:250000,
+    merge:{to:"holding",need:3},
     ups:[{k:"branch",en:"Open branches",fr:"Ouvrir des agences",cost:90000000,inc:350000,max:6},
          {k:"loan",en:"Loan department",fr:"Service prêts",cost:150000000,inc:500000,max:4}]},
+  {id:"holding",icon:"🏢",en:"Shareholding Group",fr:"Groupe de participations",base:3000000000,g:1.28,rev:2800000,
+    ups:[{k:"stake",en:"Buy stakes",fr:"Prendre des participations",cost:800000000,inc:3000000,max:5},
+         {k:"board",en:"Board seats",fr:"Sièges au conseil",cost:1200000000,inc:4000000,max:4}]},
   {id:"club",icon:"⚽",en:"Football Club",fr:"Club de football",base:1500000000,g:1.3,rev:1200000,
     ups:[{k:"stad",en:"Stadium upgrade",fr:"Rénover le stade",cost:600000000,inc:2000000,max:4},
          {k:"player",en:"Sign players",fr:"Recruter des joueurs",cost:800000000,inc:3000000,max:8}]},
@@ -144,27 +201,27 @@ const COMPANIES=[
     ups:[{k:"sat",en:"Launch satellites",fr:"Lancer des satellites",cost:20000000000,inc:60000000,max:6},
          {k:"base",en:"Build orbital base",fr:"Base orbitale",cost:40000000000,inc:90000000,max:3}]}
 ];
-const MERGE_NEED=3;
+const COMP_BY_ID={};COMPANIES.forEach(c=>COMP_BY_ID[c.id]=c);
 let openComp=null;
 
 function compCount(id){return S.companies[id]||0}
 function compLvl(id,k){return (S.compLevels[id]&&S.compLevels[id][k])||0}
 function buyPrice(c){return Math.floor(c.base*Math.pow(c.g,compCount(c.id)))}
+function vehRevOf(){return 0} // placeholder : revenu des véhicules du musée (à définir)
 function compRev(c){
   let r=compCount(c.id)*c.rev;
   c.ups.forEach(u=>{r+=compLvl(c.id,u.k)*u.inc});
   return r;
 }
-function companyRev(){
-  return COMPANIES.reduce((s,c)=>s+compRev(c),0);
-}
+function companyRev(){return COMPANIES.reduce((s,c)=>s+compRev(c),0)}
+function addStat(key,n){S.stats[key]=(S.stats[key]||0)+n}
 function buyCompany(c){
   const p=buyPrice(c);
   if(S.money<p)return;
   S.money-=p;
   S.companies[c.id]=compCount(c.id)+1;
-  click();save();update();checkAch();
-  renderCompanies();
+  S.stats.compBought++;S.stats.bought++;
+  click();save();update();checkAch();renderCompanies();
 }
 function buyCompUp(c,u){
   const lv=compLvl(c.id,u.k);
@@ -174,74 +231,269 @@ function buyCompUp(c,u){
   S.money-=cost;
   if(!S.compLevels[c.id])S.compLevels[c.id]={};
   S.compLevels[c.id][u.k]=lv+1;
-  click();save();update();checkAch();
-  renderCompanies();
+  click();save();update();checkAch();renderCompanies();
 }
-function mergeCompany(c,idx){
-  const next=COMPANIES[idx+1];
-  if(!next)return;
-  if(compCount(c.id)<MERGE_NEED)return;
-  S.companies[c.id]-=MERGE_NEED;
-  S.companies[next.id]=compCount(next.id)+1;
+function mergeCompany(c){
+  if(!c.merge)return;
+  const to=COMP_BY_ID[c.merge.to];
+  if(!to||compCount(c.id)<c.merge.need)return;
+  S.companies[c.id]-=c.merge.need;
+  S.companies[to.id]=compCount(to.id)+1;
   click();save();update();checkAch();
-  renderCompanies();
+  openComp=COMPANIES.indexOf(to);renderCompanies();
 }
 function renderCompanies(){
   const list=document.getElementById("compList");
   if(openComp===null){
-    list.innerHTML=COMPANIES.map((c,i)=>{
-      const name=S.lang==="fr"?c.fr:c.en;
-      return '<div class="comp-card" data-open="'+i+'"><div class="t">'+c.icon+' '+name+'</div><div class="d">'+t("owned")+': '+compCount(c.id)+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div>';
-    }).join("");
+    list.innerHTML=COMPANIES.map((c,i)=>
+      '<div class="comp-card" data-open="'+i+'"><div class="t">'+c.icon+' '+nm(c)+'</div><div class="d">'+t("owned")+': '+compCount(c.id)+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div>'
+    ).join("");
     list.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{openComp=+el.dataset.open;renderCompanies()});
     return;
   }
-  const idx=openComp,c=COMPANIES[idx],name=S.lang==="fr"?c.fr:c.en;
-  const price=buyPrice(c),n=compCount(c.id);
-  const next=COMPANIES[idx+1];
+  const c=COMPANIES[openComp],price=buyPrice(c),n=compCount(c.id);
   let h='<button class="back" data-back="1">'+t("back")+'</button>';
-  h+='<div class="item"><div><div class="t">'+c.icon+' '+name+'</div><div class="d">'+t("owned")+': '+n+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div></div>';
+  h+='<div class="item"><div><div class="t">'+c.icon+' '+nm(c)+'</div><div class="d">'+t("owned")+': '+n+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div></div>';
   h+='<div class="item"><div><div class="t">'+t("buy")+'</div><div class="d">'+t("price")+': '+fmt(price)+'</div></div><button data-buy="1" '+(S.money<price?"disabled":"")+'>'+t("buy")+'</button></div>';
-  if(next){
-    const ok=n>=MERGE_NEED;
-    h+='<div class="item"><div><div class="t">'+t("merge")+' → '+next.icon+' '+(S.lang==="fr"?next.fr:next.en)+'</div><div class="d">'+MERGE_NEED+' × '+name+'</div></div><button data-merge="1" '+(ok?"":"disabled")+'>'+t("merge")+'</button></div>';
+  if(c.merge){
+    const to=COMP_BY_ID[c.merge.to],ok=n>=c.merge.need;
+    h+='<div class="item"><div><div class="t">'+t("merge")+' → '+to.icon+' '+nm(to)+'</div><div class="d">'+c.merge.need+' × '+nm(c)+'</div></div><button data-merge="1" '+(ok?"":"disabled")+'>'+t("merge")+'</button></div>';
   }
   h+='<div class="sec">'+t("upgrades")+'</div>';
   c.ups.forEach(u=>{
     const lv=compLvl(c.id,u.k),mx=lv>=u.max;
     const cost=Math.floor(u.cost*Math.pow(1.5,lv));
-    const uname=S.lang==="fr"?u.fr:u.en;
-    h+='<div class="item"><div><div class="t">'+uname+' <small>('+t("lvl")+' '+lv+'/'+u.max+')</small></div><div class="d">+'+fmt(u.inc)+' '+t("persec")+'</div></div><button data-cu="'+u.k+'" '+(mx||n<1||S.money<cost?"disabled":"")+'>'+(mx?t("max"):fmt(cost))+'</button></div>';
+    h+='<div class="item"><div><div class="t">'+nm(u)+' <small>('+t("lvl")+' '+lv+'/'+u.max+')</small></div><div class="d">+'+fmt(u.inc)+' '+t("persec")+'</div></div><button data-cu="'+u.k+'" '+(mx||n<1||S.money<cost?"disabled":"")+'>'+(mx?t("max"):fmt(cost))+'</button></div>';
   });
   list.innerHTML=h;
   list.querySelector("[data-back]").onclick=()=>{openComp=null;renderCompanies()};
   list.querySelector("[data-buy]").onclick=()=>buyCompany(c);
   const mb=list.querySelector("[data-merge]");
-  if(mb)mb.onclick=()=>mergeCompany(c,idx);
+  if(mb)mb.onclick=()=>mergeCompany(c);
   list.querySelectorAll("[data-cu]").forEach(b=>b.onclick=()=>{
-    const u=c.ups.find(x=>x.k===b.dataset.cu);buyCompUp(c,u);
+    buyCompUp(c,c.ups.find(x=>x.k===b.dataset.cu));
   });
 }
+      </script>
+<script>
+// ============ IMMOBILIER ============
+const RE=[
+  {id:"re1",icon:"🏠",en:"Studio flat",fr:"Studio",price:200000,rent:120},
+  {id:"re2",icon:"🏡",en:"Family house",fr:"Maison familiale",price:450000,rent:300},
+  {id:"re3",icon:"🏘️",en:"Townhouse row",fr:"Rangée de maisons",price:900000,rent:650},
+  {id:"re4",icon:"🏢",en:"Apartment block",fr:"Immeuble d'habitation",price:2000000,rent:1500},
+  {id:"re5",icon:"🏬",en:"Retail building",fr:"Immeuble commercial",price:5000000,rent:4000},
+  {id:"re6",icon:"🏨",en:"Boutique hotel",fr:"Hôtel boutique",price:12000000,rent:10000},
+  {id:"re7",icon:"🏗️",en:"Office tower",fr:"Tour de bureaux",price:35000000,rent:30000},
+  {id:"re8",icon:"🏙️",en:"Business district block",fr:"Bloc d'affaires",price:90000000,rent:85000},
+  {id:"re9",icon:"🌆",en:"Skyscraper",fr:"Gratte-ciel",price:250000000,rent:260000},
+  {id:"re10",icon:"🏯",en:"Luxury resort",fr:"Resort de luxe",price:700000000,rent:750000},
+  {id:"re11",icon:"🛕",en:"Historic palace",fr:"Palais historique",price:2000000000,rent:2200000},
+  {id:"re12",icon:"🗼",en:"Landmark tower",fr:"Tour emblématique",price:6000000000,rent:6500000},
+  {id:"re13",icon:"🏟️",en:"Mega stadium complex",fr:"Complexe de stades",price:18000000000,rent:19000000},
+  {id:"re14",icon:"🌃",en:"Smart city district",fr:"Quartier intelligent",price:55000000000,rent:55000000},
+  {id:"re15",icon:"🌌",en:"Island megaproject",fr:"Mégaprojet insulaire",price:250000000000,rent:260000000}
+];
+const RE_UPS=[
+  {k:"paint",en:"Renovation",fr:"Rénovation",mult:0.15,base:0.2},
+  {k:"energy",en:"Energy efficiency",fr:"Efficacité énergétique",mult:0.12,base:0.25},
+  {k:"security",en:"Security system",fr:"Système de sécurité",mult:0.10,base:0.3},
+  {k:"amen",en:"Amenities",fr:"Équipements",mult:0.18,base:0.35}
+];
+const RE_UP_MAX=5;
+let reSortMode="asc";
+function reOwned(id){return S.re[id]||0}
+function reLevel(id,k){return (S.reLv[id]&&S.reLv[id][k])||0}
+function reUpCost(re,u){return Math.floor(re.price*u.base*Math.pow(1.6,reLevel(re.id,u.k)))}
+function reRentOne(re){
+  let m=1;
+  RE_UPS.forEach(u=>{m+=u.mult*reLevel(re.id,u.k)});
+  return re.rent*m;
+}
+function reIncome(){
+  return RE.reduce((s,re)=>s+reOwned(re.id)*reRentOne(re),0);
+}
+function buyRE(re){
+  if(S.money<re.price)return;
+  S.money-=re.price;
+  S.re[re.id]=reOwned(re.id)+1;
+  S.stats.reBought++;S.stats.bought++;
+  click();save();update();checkAch();renderGoods();
+}
+function buyREUp(re,u){
+  const lv=reLevel(re.id,u.k);
+  if(lv>=RE_UP_MAX||reOwned(re.id)<1)return;
+  const cost=reUpCost(re,u);
+  if(S.money<cost)return;
+  S.money-=cost;
+  if(!S.reLv[re.id])S.reLv[re.id]={};
+  S.reLv[re.id][u.k]=lv+1;
+  click();save();update();checkAch();renderGoods();
+}
 
-// ============ UPGRADES DE LA CARTE (manuel uniquement, plafonnées) ============
-const UPS={
-click:{base:12,g:1.3,key:"u_click",max:50},
-mult:{base:600,g:1.9,key:"u_mult",max:10},
-tap:{base:300,g:1.4,key:"u_tap",max:30},
-lucky:{base:2000,g:1.6,key:"u_lucky",max:25}
-};
-function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
-function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
-function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.1,S.ups.mult)}
-function perSecond(){return companyRev()}
-function luckyChance(){return Math.min(0.5,S.ups.lucky*0.02)}
+// ============ VÉHICULES ============
+const CARS=[
+  {id:"c1",icon:"🚗",en:"Compact Hatch",fr:"Citadine",price:12000},
+  {id:"c2",icon:"🚙",en:"Family SUV",fr:"SUV familial",price:32000},
+  {id:"c3",icon:"🚕",en:"Yellow Cab",fr:"Taxi jaune",price:28000},
+  {id:"c4",icon:"🚐",en:"Minivan",fr:"Monospace",price:35000},
+  {id:"c5",icon:"🛻",en:"Pickup Truck",fr:"Pick-up",price:45000},
+  {id:"c6",icon:"🏎️",en:"Sport Coupe",fr:"Coupé sportif",price:65000},
+  {id:"c7",icon:"🚘",en:"Sedan",fr:"Berline",price:38000},
+  {id:"c8",icon:"🚖",en:"Ride-share Sedan",fr:"Berline VTC",price:42000},
+  {id:"c9",icon:"🚓",en:"Patrol Car",fr:"Voiture de patrouille",price:52000},
+  {id:"c10",icon:"🚑",en:"Ambulance Van",fr:"Ambulance",price:120000},
+  {id:"c11",icon:"🚒",en:"Fire Engine",fr:"Camion de pompiers",price:350000},
+  {id:"c12",icon:"🏁",en:"Race Car",fr:"Voiture de course",price:250000},
+  {id:"c13",icon:"🚜",en:"Tractor",fr:"Tracteur",price:90000},
+  {id:"c14",icon:"🚚",en:"Delivery Truck",fr:"Camion de livraison",price:110000},
+  {id:"c15",icon:"🚛",en:"Semi Truck",fr:"Semi-remorque",price:180000},
+  {id:"c16",icon:"🚌",en:"City Bus",fr:"Bus urbain",price:300000},
+  {id:"c17",icon:"🚍",en:"Coach Bus",fr:"Autocar",price:420000},
+  {id:"c18",icon:"🚗",en:"Electric Sedan",fr:"Berline électrique",price:55000},
+  {id:"c19",icon:"🏎️",en:"Hypercar",fr:"Hypercar",price:2500000},
+  {id:"c20",icon:"🚙",en:"Armored Limo",fr:"Limousine blindée",price:850000}
+];
+const AIRCRAFT=[
+  {id:"a1",icon:"🛩️",en:"Single-engine Piper",fr:"Piper monomoteur",price:250000},
+  {id:"a2",icon:"✈️",en:"Twin-prop Commuter",fr:"Bimoteur navette",price:1500000},
+  {id:"a3",icon:"🛫",en:"Business Jet",fr:"Jet d'affaires",price:9000000},
+  {id:"a4",icon:"🚁",en:"Light Helicopter",fr:"Hélicoptère léger",price:1200000},
+  {id:"a5",icon:"🚁",en:"Heavy Helicopter",fr:"Hélicoptère lourd",price:12000000},
+  {id:"a6",icon:"✈️",en:"Regional Airliner",fr:"Avion régional",price:45000000},
+  {id:"a7",icon:"✈️",en:"Narrow-body Airliner",fr:"Monocouloir",price:90000000},
+  {id:"a8",icon:"✈️",en:"Wide-body Airliner",fr:"Biréacteur long-courrier",price:250000000},
+  {id:"a9",icon:"🛸",en:"Cargo Freighter",fr:"Avion cargo",price:400000000},
+  {id:"a10",icon:"🚀",en:"Private Spaceplane",fr:"Avion spatial privé",price:3000000000}
+];
+const BOATS=[
+  {id:"b1",icon:"🚤",en:"Speedboat",fr:"Vedette",price:40000},
+  {id:"b2",icon:"⛵",en:"Sailboat",fr:"Voilier",price:85000},
+  {id:"b3",icon:"🛥️",en:"Motor Yacht",fr:"Yacht à moteur",price:900000},
+  {id:"b4",icon:"🚢",en:"Ferry",fr:"Ferry",price:20000000},
+  {id:"b5",icon:"🛳️",en:"Cruise Liner",fr:"Paquebot",price:800000000},
+  {id:"b6",icon:"⛴️",en:"Cargo Ship",fr:"Cargo",price:60000000},
+  {id:"b7",icon:"🛶",en:"Super Yacht",fr:"Superyacht",price:300000000}
+];
+const VEH_GROUPS={cars:CARS,aircraft:AIRCRAFT,boats:BOATS};
+let vehCat="cars";
+function vehOwned(id){return S.veh[id]||0}
+function buyVeh(v){
+  if(S.money<v.price)return;
+  S.money-=v.price;
+  S.veh[v.id]=vehOwned(v.id)+1;
+  S.stats.vehBought++;S.stats.bought++;
+  click();save();update();checkAch();renderGoods();
+}
 
-// ============ FORMAT ============
-function fmt(n){
-  if(n<1000)return "$"+(n%1===0?n:n.toFixed(1));
-  const u=["K","M","B","T","Qa"];let i=-1;
-  while(n>=1000&&i<u.length-1){n/=1000;i++}
-  return "$"+n.toFixed(2)+u[i];
+// ============ ONGLET BIENS (navigation) ============
+let goodsView="root"; // root | re | veh | vehCat
+function renderGoods(){
+  const root=document.getElementById("goodsRoot");
+  if(goodsView==="root"){
+    root.innerHTML=
+      '<div class="blockCard" data-gv="re">🏘️ '+t("realestate")+'<small>'+RE.filter(r=>reOwned(r.id)>0).length+'/'+RE.length+' • '+t("rent")+': '+fmt(reIncome())+' '+t("persec")+'</small></div>'+
+      '<div class="blockCard" data-gv="veh">🚘 '+t("vehicles")+'<small>'+Object.values(S.veh).reduce((a,b)=>a+b,0)+' '+t("pVehB").toLowerCase()+'</small></div>';
+    root.querySelectorAll("[data-gv]").forEach(b=>b.onclick=()=>{goodsView=b.dataset.gv;renderGoods()});
+    return;
+  }
+  if(goodsView==="re"){
+    const list=RE.slice().sort((a,b)=>reSortMode==="asc"?a.price-b.price:b.price-a.price);
+    let h='<button class="back" data-gb="root">'+t("back")+'</button>';
+    h+='<div class="toolbar"><div class="sec" style="margin:0">'+t("realestate")+'</div><button class="sortBtn" id="sortBtn">'+(reSortMode==="asc"?t("sortAsc"):t("sortDesc"))+'</button></div>';
+    list.forEach(re=>{
+      const n=reOwned(re.id);
+      h+='<div class="item"><div style="flex:1"><div class="t">'+re.icon+' '+nm(re)+' <small>×'+n+'</small></div>'+
+        '<div class="d">'+t("price")+': '+fmt(re.price)+' • '+t("rent")+': '+fmt(reRentOne(re))+' '+t("persec")+'</div>'+
+        (n>0?RE_UPS.map(u=>'<div class="d" style="margin-top:4px">'+nm(u)+' '+reLevel(re.id,u.k)+'/'+RE_UP_MAX+' <button data-reup="'+re.id+'|'+u.k+'" '+(reLevel(re.id,u.k)>=RE_UP_MAX||S.money<reUpCost(re,u)?"disabled":"")+' style="padding:3px 8px;margin-left:6px">'+(reLevel(re.id,u.k)>=RE_UP_MAX?t("max"):fmt(reUpCost(re,u)))+'</button></div>').join(""):"")+
+        '</div><button data-rebuy="'+re.id+'" '+(S.money<re.price?"disabled":"")+'>'+t("buy")+'</button></div>';
+    });
+    root.innerHTML=h;
+    root.querySelector('[data-gb="root"]').onclick=()=>{goodsView="root";renderGoods()};
+    document.getElementById("sortBtn").onclick=()=>{reSortMode=reSortMode==="asc"?"desc":"asc";renderGoods()};
+    root.querySelectorAll("[data-rebuy]").forEach(b=>b.onclick=()=>buyRE(RE.find(r=>r.id===b.dataset.rebuy)));
+    root.querySelectorAll("[data-reup]").forEach(b=>b.onclick=()=>{
+      const [id,k]=b.dataset.reup.split("|");
+      buyREUp(RE.find(r=>r.id===id),RE_UPS.find(u=>u.k===k));
+    });
+    return;
+  }
+  if(goodsView==="veh"){
+    root.innerHTML=
+      '<button class="back" data-gb="root">'+t("back")+'</button>'+
+      '<div class="blockCard" data-vc="cars">🚗 '+t("cars")+'<small>'+CARS.filter(v=>vehOwned(v.id)>0).length+'/'+CARS.length+'</small></div>'+
+      '<div class="blockCard" data-vc="aircraft">✈️ '+t("aircraft")+'<small>'+AIRCRAFT.filter(v=>vehOwned(v.id)>0).length+'/'+AIRCRAFT.length+'</small></div>'+
+      '<div class="blockCard" data-vc="boats">🛥️ '+t("boats")+'<small>'+BOATS.filter(v=>vehOwned(v.id)>0).length+'/'+BOATS.length+'</small></div>';
+    root.querySelector('[data-gb="root"]').onclick=()=>{goodsView="root";renderGoods()};
+    root.querySelectorAll("[data-vc]").forEach(b=>b.onclick=()=>{goodsView="vehCat";vehCat=b.dataset.vc;renderGoods()});
+    return;
+  }
+  if(goodsView==="vehCat"){
+    const list=VEH_GROUPS[vehCat];
+    let h='<button class="back" data-gb="veh">'+t("back")+'</button>';
+    h+='<div class="sec">'+t(vehCat)+'</div>';
+    list.forEach(v=>{
+      const n=vehOwned(v.id);
+      h+='<div class="item"><div><div class="t">'+v.icon+' '+nm(v)+' <small>×'+n+'</small></div><div class="d">'+t("price")+': '+fmt(v.price)+'</div></div><button data-vbuy="'+v.id+'" '+(S.money<v.price?"disabled":"")+'>'+t("buy")+'</button></div>';
+    });
+    root.innerHTML=h;
+    root.querySelector('[data-gb="veh"]').onclick=()=>{goodsView="veh";renderGoods()};
+    root.querySelectorAll("[data-vbuy]").forEach(b=>b.onclick=()=>{
+      const all=[...CARS,...AIRCRAFT,...BOATS];
+      buyVeh(all.find(v=>v.id===b.dataset.vbuy));
+    });
+  }
+}
+  </script>
+<script>
+// ============ PROFIL ============
+function renderProfile(){
+  const total=S.total||1;
+  const cardPct=S.stats.byCard/total*100;
+  const compPct=S.stats.byComp/total*100;
+  const rePct=S.stats.byRe/total*100;
+  const vehPct=S.stats.byVeh/total*100;
+  const other=Math.max(0,100-cardPct-compPct-rePct-vehPct);
+  const row=(label,val,pct)=>'<div class="stat"><span>'+label+'</span><span>'+fmt(val)+' <small style="opacity:.6">('+pct.toFixed(1)+'% '+t("pShare")+')</small></span></div>'+
+    '<div class="bar"><div style="width:'+Math.min(100,pct).toFixed(1)+'%"></div></div>';
+  let h='';
+  h+='<div class="item"><div><div class="t">'+t("pTotal")+'</div><div class="d" style="font-size:22px;color:var(--accent)">'+fmt(S.total)+'</div></div></div>';
+  h+='<div class="sec">'+t("pTotal")+' — %</div>';
+  h+=row(t("pCard"),S.stats.byCard,cardPct);
+  h+=row(t("pComp"),S.stats.byComp,compPct);
+  h+=row(t("pRe"),S.stats.byRe,rePct);
+  h+=row(t("pVeh"),S.stats.byVeh,vehPct);
+  h+=row(t("pOther"),Math.max(0,S.total-S.stats.byCard-S.stats.byComp-S.stats.byRe-S.stats.byVeh),other);
+  h+='<div class="sec">'+t("pBought")+'</div>';
+  h+='<div class="stat"><span>'+t("pBought")+'</span><span>'+S.stats.bought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pCompB")+'</span><span>'+S.stats.compBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pReB")+'</span><span>'+S.stats.reBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pVehB")+'</span><span>'+S.stats.vehBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pClicks")+'</span><span>'+S.clicks+'</span></div>';
+  h+='<div class="stat"><span>'+t("pAch")+'</span><span>'+Object.keys(S.ach).length+'/'+ACH.length+'</span></div>';
+  document.getElementById("profList").innerHTML=h;
+}
+// Comptabilisation des revenus par source (appelée à chaque gain passif)
+function addIncome(src,n){
+  if(n<=0)return;
+  S.total+=n;
+  S.stats[src]=(S.stats[src]||0)+n;
+}
+
+// ============ SKINS ============
+function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
+function renderSkinSel(){
+  const sel=document.getElementById("skinSel");
+  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
+  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
+  sel.value=S.skinChoice;
+}
+function applySkin(){
+  const s=currentSkin(),c=document.getElementById("card");
+  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
+  document.getElementById("pattern").style.background=s.pat;
+  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
+  document.getElementById("money").style.color=s.acc;
 }
 
 // ============ SON ============
@@ -262,15 +514,12 @@ function click(){
     o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
   }catch(e){}
 }
-const CHORDS=[
-  [261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]
-];
+const CHORDS=[[261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]];
 const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
 let chordIdx=0,melIdx=0,musicStarted=false,musicGain=null,musicTimer=null;
 function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
 function playNote(freq,start,dur,type,peak){
-  const a=AC;
-  const o=a.createOscillator(),g=a.createGain();
+  const a=AC,o=a.createOscillator(),g=a.createGain();
   o.type=type;o.frequency.value=freq;
   g.gain.setValueAtTime(0,start);
   g.gain.linearRampToValueAtTime(peak,start+Math.min(0.4,dur*0.3));
@@ -321,7 +570,8 @@ document.addEventListener("visibilitychange",()=>{
     }
   }
 });
-// ============ ACHIEVEMENTS ============
+
+// ============ SUCCÈS ============
 const ACH=[];
 [100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
   ACH.push({id:"m"+v,en:"Hold "+fmt(v),fr:"Avoir "+fmt(v)+" en compte",gem:1+i,test:()=>S.money>=v}));
@@ -332,11 +582,14 @@ ACH.push({id:"ul10",en:"Lucky Tap",fr:"Clic chanceux",gem:3,test:()=>S.ups.lucky
 ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
 ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
 COMPANIES.forEach((c,i)=>{
-  ACH.push({id:"co"+c.id,en:"Own a "+c.en,fr:"Posséder : "+c.fr,gem:2+Math.min(i,4),test:()=>compCount(c.id)>=1});
+  ACH.push({id:"co"+c.id,en:"Own a "+c.en,fr:"Posséder : "+nm(c),gem:2+Math.min(i,4),test:()=>compCount(c.id)>=1});
+});
+RE.forEach((re,i)=>{
+  ACH.push({id:"re"+re.id,en:"Own "+re.en,fr:"Posséder : "+nm(re),gem:2+Math.min(i,5),test:()=>reOwned(re.id)>=1});
 });
 SKINS.forEach((s,i)=>{
   if(i===0)return;
-  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,test:()=>S.money>=s.at});
+  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,test:()=>S.money>=s.at||S.total>=s.at});
 });
 function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
 function checkAch(){
@@ -375,27 +628,12 @@ function renderAch(){
   updateBadge();
 }
 
-// ============ SKIN ============
-function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
-function renderSkinSel(){
-  const sel=document.getElementById("skinSel");
-  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
-  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
-  sel.value=S.skinChoice;
-}
-function applySkin(){
-  const s=currentSkin(),r=document.documentElement.style;
-  r.setProperty("--card1",s.g1);r.setProperty("--card2",s.g2);
-  r.setProperty("--bg1",s.bg1);r.setProperty("--bg2",s.bg2);r.setProperty("--accent",s.acc);
-  document.body.style.background="linear-gradient(160deg,var(--bg1),var(--bg2))";
-}
-
 // ============ UI ============
-function addMoney(n){S.money+=n;S.total+=n}
+function addMoney(n){S.money+=n}
 function renderUps(){
   document.getElementById("upsList").innerHTML=Object.keys(UPS).map(k=>{
     const mx=isMax(k);
-    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+'/'+UPS[k].max+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
+    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
   }).join("");
   document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
     const k=b.dataset.u,c=cost(k);
@@ -411,7 +649,9 @@ function update(){
 function applyLang(){
   document.getElementById("nGame").textContent=t("card");
   document.getElementById("nComp").textContent=t("comp");
+  document.getElementById("nGoods").textContent=t("goods");
   document.getElementById("hAch").textContent=t("ach");
+  document.getElementById("nProf").textContent=t("prof");
   document.getElementById("nSet").textContent=t("set");
   document.getElementById("hUp").textContent=t("up");
   document.getElementById("lLang").textContent=t("lang");
@@ -426,10 +666,11 @@ function applyLang(){
   document.getElementById("sndSel").value=S.snd;
   document.getElementById("musSel").value=S.mus;
   document.getElementById("volRange").value=S.vol;
-  renderSkinSel();renderAch();update();renderCompanies();
+  renderSkinSel();renderAch();update();renderCompanies();renderGoods();renderProfile();
 }
 function updateStickyHeader(page){document.body.classList.toggle("on-card",page==="game")}
-
+      </script>
+<script>
 // ============ RESET ============
 let saveTimer=null;
 function resetGame(){
@@ -443,7 +684,8 @@ function resetGame(){
 document.getElementById("card").addEventListener("pointerdown",e=>{
   let g=perClick(),lucky=false;
   if(Math.random()<luckyChance()){g*=5;lucky=true}
-  addMoney(g);S.clicks++;click();
+  S.clicks++;click();
+  addIncome("byCard",g);
   const f=document.createElement("div");
   f.className="float"+(lucky?" lucky":"");
   f.textContent="+"+fmt(g)+(lucky?" ★":"");
@@ -459,6 +701,8 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   b.classList.add("active");
   document.getElementById(b.dataset.p).classList.add("active");
   if(b.dataset.p==="comp"){openComp=null;renderCompanies()}
+  if(b.dataset.p==="goods"){goodsView="root";renderGoods()}
+  if(b.dataset.p==="profile")renderProfile();
   updateStickyHeader(b.dataset.p);
 });
 document.getElementById("claimAll").onclick=()=>{
@@ -478,9 +722,13 @@ document.getElementById("resetBtn").addEventListener("click",resetGame);
 
 // ============ LOOP ============
 setInterval(()=>{
-  const ps=perSecond();
-  if(ps>0){addMoney(ps);update()}
+  const cr=compRevenueTick(),rr=reIncome(),ps=perSecond();
+  if(cr>0)addIncome("byComp",cr);
+  if(rr>0)addIncome("byRe",rr);
   if(document.getElementById("comp").classList.contains("active"))renderCompanies();
+  if(document.getElementById("goods").classList.contains("active"))renderGoods();
+  if(document.getElementById("profile").classList.contains("active"))renderProfile();
+  update();
   checkAch();
 },1000);
 saveTimer=setInterval(save,10000);
