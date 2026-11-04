@@ -111,9 +111,8 @@ select option{background:#2a2a33;color:var(--text)}
 const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,
   ups:{click:0,mult:0,tap:0,lucky:0},ach:{},claimed:{},skinChoice:0,
   companies:{},compLevels:{},
-  re:{},            // real estate : id -> nb possédés
-  reLv:{},          // real estate upgrades : id -> {k:lvl}
-  veh:{},           // véhicules : id -> nb possédés
+  re:{},reLv:{},
+  veh:{},
   stats:{byCard:0,byComp:0,byRe:0,byVeh:0,bought:0,compBought:0,reBought:0,vehBought:0},
   reSort:"asc"
 };
@@ -122,6 +121,14 @@ for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
 for(const k in DEF.stats){if(S.stats[k]===undefined)S.stats[k]=0}
 function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
+
+// ============ FORMAT ============
+function fmt(n){
+  if(n<1000)return "$"+(n%1===0?n:n.toFixed(1));
+  const u=["K","M","B","T","Qa"];let i=-1;
+  while(n>=1000&&i<u.length-1){n/=1000;i++}
+  return "$"+n.toFixed(2)+u[i];
+}
 
 // ============ TEXTES ============
 const TX={
@@ -156,6 +163,19 @@ const SKINS=[
 ];
 </script>
 <script>
+// ============ UPGRADES DE LA CARTE ============
+const UPS={
+  click:{base:15,g:1.35,key:"u_click",max:50},
+  mult:{base:900,g:2.1,key:"u_mult",max:10},
+  tap:{base:400,g:1.45,key:"u_tap",max:30},
+  lucky:{base:2500,g:1.6,key:"u_lucky",max:25}
+};
+function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
+function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
+function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.1,S.ups.mult)}
+function luckyChance(){return 0.02*S.ups.lucky}
+function perSecond(){return companyRev()+reIncome()}
+
 // ============ ENTREPRISES : DONNÉES ============
 // merge:{to:"id", need:N} => fusion possible seulement si défini
 const COMPANIES=[
@@ -207,14 +227,59 @@ let openComp=null;
 function compCount(id){return S.companies[id]||0}
 function compLvl(id,k){return (S.compLevels[id]&&S.compLevels[id][k])||0}
 function buyPrice(c){return Math.floor(c.base*Math.pow(c.g,compCount(c.id)))}
-function vehRevOf(){return 0} // placeholder : revenu des véhicules du musée (à définir)
 function compRev(c){
   let r=compCount(c.id)*c.rev;
   c.ups.forEach(u=>{r+=compLvl(c.id,u.k)*u.inc});
   return r;
 }
 function companyRev(){return COMPANIES.reduce((s,c)=>s+compRev(c),0)}
+</script>
+<script>
+// ============ IMMOBILIER : DONNÉES ============
+// Triés du moins cher au plus cher. rent = revenu par seconde.
+const RE=[
+  {id:"studio",en:"Studio",fr:"Studio",price:5000,rent:2},
+  {id:"flat",en:"Flat",fr:"Appartement",price:45000,rent:20},
+  {id:"house",en:"House",fr:"Maison",price:180000,rent:90},
+  {id:"duplex",en:"Duplex",fr:"Duplex",price:600000,rent:350},
+  {id:"building",en:"Small building",fr:"Petit immeuble",price:3000000,rent:2000},
+  {id:"tower",en:"Office tower",fr:"Tour de bureaux",price:25000000,rent:18000},
+  {id:"mall",en:"Shopping mall",fr:"Centre commercial",price:200000000,rent:150000},
+  {id:"island",en:"Private island",fr:"Île privée",price:2000000000,rent:1600000}
+];
+const RE_BY_ID={};RE.forEach(r=>RE_BY_ID[r.id]=r);
+function reOwned(id){return S.re[id]||0}
+function rePrice(r){return Math.floor(r.price*Math.pow(1.12,reOwned(r.id)))}
+function reIncome(){
+  return RE.reduce((s,r)=>s+reOwned(r.id)*r.rent,0);
+}
+
+// ============ VÉHICULES : DONNÉES ============
+// Catégories : cars / aircraft / boats. Les véhicules se placent dans les musées.
+const VEH=[
+  {id:"car1",cat:"cars",en:"Compact car",fr:"Citadine",price:15000,mus:40},
+  {id:"car2",cat:"cars",en:"Sports car",fr:"Voiture de sport",price:300000,mus:900},
+  {id:"car3",cat:"cars",en:"Classic car",fr:"Voiture de collection",price:2500000,mus:6000},
+  {id:"air1",cat:"aircraft",en:"Light plane",fr:"Avion léger",price:8000000,mus:20000},
+  {id:"air2",cat:"aircraft",en:"Jet",fr:"Jet privé",price:120000000,mus:250000},
+  {id:"boat1",cat:"boats",en:"Motorboat",fr:"Hors-bord",price:1000000,mus:2500},
+  {id:"boat2",cat:"boats",en:"Yacht",fr:"Yacht",price:50000000,mus:110000}
+];
+const VEH_BY_ID={};VEH.forEach(v=>VEH_BY_ID[v.id]=v);
+function vehOwned(id){return S.veh[id]||0}
+function vehPrice(v){return Math.floor(v.price*Math.pow(1.1,vehOwned(v.id)))}
+</script>
+<script>
+// ============ REVENUS COMPTABILISÉS ============
+function addIncome(src,n){
+  if(n<=0)return;
+  S.total+=n;
+  S.stats[src]=(S.stats[src]||0)+n;
+  S.money+=n;
+}
 function addStat(key,n){S.stats[key]=(S.stats[key]||0)+n}
+
+// ============ ACHATS ENTREPRISES ============
 function buyCompany(c){
   const p=buyPrice(c);
   if(S.money<p)return;
@@ -242,6 +307,148 @@ function mergeCompany(c){
   click();save();update();checkAch();
   openComp=COMPANIES.indexOf(to);renderCompanies();
 }
+
+// ============ ACHATS IMMOBILIER ============
+function buyRe(r){
+  const p=rePrice(r);
+  if(S.money<p)return;
+  S.money-=p;
+  S.re[r.id]=reOwned(r.id)+1;
+  S.stats.reBought++;S.stats.bought++;
+  click();save();update();checkAch();renderGoods();
+}
+
+// ============ ACHATS VÉHICULES ============
+function buyVeh(v){
+  const p=vehPrice(v);
+  if(S.money<p)return;
+  S.money-=p;
+  S.veh[v.id]=vehOwned(v.id)+1;
+  S.stats.vehBought++;S.stats.bought++;
+  click();save();update();checkAch();renderGoods();
+}
+
+// ============ PROFIL ============
+function renderProfile(){
+  const total=S.total||1;
+  const pct=v=>v/total*100;
+  const otherVal=Math.max(0,S.total-S.stats.byCard-S.stats.byComp-S.stats.byRe-S.stats.byVeh);
+  const row=(label,val)=>{
+    const p=pct(val);
+    return '<div class="stat"><span>'+label+'</span><span>'+fmt(val)+' <small style="opacity:.6">('+p.toFixed(1)+'%)</small></span></div>'+
+      '<div class="bar"><div style="width:'+Math.min(100,p).toFixed(1)+'%"></div></div>';
+  };
+  let h='';
+  h+='<div class="item"><div><div class="t">'+t("pTotal")+'</div><div class="d" style="font-size:22px;color:var(--accent)">'+fmt(S.total)+'</div></div></div>';
+  h+='<div class="sec">'+t("pShare")+'</div>';
+  h+=row(t("pCard"),S.stats.byCard);
+  h+=row(t("pComp"),S.stats.byComp);
+  h+=row(t("pRe"),S.stats.byRe);
+  h+=row(t("pVeh"),S.stats.byVeh);
+  h+=row(t("pOther"),otherVal);
+  h+='<div class="sec">'+t("pBought")+'</div>';
+  h+='<div class="stat"><span>'+t("pBought")+'</span><span>'+S.stats.bought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pCompB")+'</span><span>'+S.stats.compBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pReB")+'</span><span>'+S.stats.reBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pVehB")+'</span><span>'+S.stats.vehBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pClicks")+'</span><span>'+S.clicks+'</span></div>';
+  h+='<div class="stat"><span>'+t("pAch")+'</span><span>'+Object.keys(S.ach).length+'/'+ACH.length+'</span></div>';
+  document.getElementById("profList").innerHTML=h;
+}
+
+// ============ SKINS ============
+function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
+function renderSkinSel(){
+  const sel=document.getElementById("skinSel");
+  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
+  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
+  sel.value=S.skinChoice;
+}
+function applySkin(){
+  const s=currentSkin(),c=document.getElementById("card");
+  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
+  document.getElementById("pattern").style.background=s.pat;
+  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
+  document.getElementById("money").style.color=s.acc;
+}
+
+// ============ SON ============
+let AC=null;
+function getAC(){
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==="suspended"&&!document.hidden)AC.resume();
+  return AC;
+}
+function click(){
+  if(!S.snd)return;
+  try{
+    const a=getAC();
+    const o=a.createOscillator(),g=a.createGain();
+    o.frequency.value=520+Math.random()*60;o.type="triangle";
+    g.gain.setValueAtTime(.06,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
+    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
+  }catch(e){}
+}
+const CHORDS=[[261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]];
+const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
+let chordIdx=0,melIdx=0,musicStarted=false,musicGain=null,musicTimer=null;
+function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
+function playNote(freq,start,dur,type,peak){
+  const a=AC,o=a.createOscillator(),g=a.createGain();
+  o.type=type;o.frequency.value=freq;
+  g.gain.setValueAtTime(0,start);
+  g.gain.linearRampToValueAtTime(peak,start+Math.min(0.4,dur*0.3));
+  g.gain.linearRampToValueAtTime(0,start+dur);
+  o.connect(g);g.connect(musicGain);
+  o.start(start);o.stop(start+dur+0.05);
+}
+function playChord(){
+  if(!S.mus||!AC||document.hidden||!musicGain)return;
+  try{
+    const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
+    ch.forEach(f=>playNote(f,now,3.8,"triangle",0.18));
+    for(let i=0;i<2;i++){
+      const f=MELODY[melIdx%MELODY.length];melIdx++;
+      playNote(f,now+0.3+i*1.8,1.2,"sine",0.14);
+    }
+  }catch(e){}
+}
+function startMusic(){
+  if(musicStarted)return;
+  try{
+    const a=getAC();
+    musicGain=a.createGain();
+    musicGain.gain.value=musicVol();
+    musicGain.connect(a.destination);
+    musicStarted=true;
+    playChord();
+    musicTimer=setInterval(playChord,4000);
+  }catch(e){}
+}
+function updateMusicVol(){
+  if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
+}
+["pointerdown","touchstart","keydown"].forEach(ev=>
+  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
+document.addEventListener("visibilitychange",()=>{
+  if(!AC)return;
+  if(document.hidden){
+    if(musicGain){musicGain.gain.cancelScheduledValues(AC.currentTime);musicGain.gain.setValueAtTime(0,AC.currentTime)}
+    AC.suspend();
+  }else{
+    if(AC.state==="suspended")AC.resume();
+    if(musicGain){
+      const target=musicVol();
+      musicGain.gain.cancelScheduledValues(AC.currentTime);
+      musicGain.gain.setValueAtTime(0,AC.currentTime);
+      musicGain.gain.linearRampToValueAtTime(target,AC.currentTime+1.5);
+    }
+  }
+});
+</script>
+<script>
+// ============ RENDU ENTREPRISES ============
 function renderCompanies(){
   const list=document.getElementById("compList");
   if(openComp===null){
@@ -274,567 +481,65 @@ function renderCompanies(){
     buyCompUp(c,c.ups.find(x=>x.k===b.dataset.cu));
   });
 }
-      </script>
-<script>
-// ============ IMMOBILIER ============
-const RE=[
-  {id:"re1",icon:"🏠",en:"Studio flat",fr:"Studio",price:200000,rent:120},
-  {id:"re2",icon:"🏡",en:"Family house",fr:"Maison familiale",price:450000,rent:300},
-  {id:"re3",icon:"🏘️",en:"Townhouse row",fr:"Rangée de maisons",price:900000,rent:650},
-  {id:"re4",icon:"🏢",en:"Apartment block",fr:"Immeuble d'habitation",price:2000000,rent:1500},
-  {id:"re5",icon:"🏬",en:"Retail building",fr:"Immeuble commercial",price:5000000,rent:4000},
-  {id:"re6",icon:"🏨",en:"Boutique hotel",fr:"Hôtel boutique",price:12000000,rent:10000},
-  {id:"re7",icon:"🏗️",en:"Office tower",fr:"Tour de bureaux",price:35000000,rent:30000},
-  {id:"re8",icon:"🏙️",en:"Business district block",fr:"Bloc d'affaires",price:90000000,rent:85000},
-  {id:"re9",icon:"🌆",en:"Skyscraper",fr:"Gratte-ciel",price:250000000,rent:260000},
-  {id:"re10",icon:"🏯",en:"Luxury resort",fr:"Resort de luxe",price:700000000,rent:750000},
-  {id:"re11",icon:"🛕",en:"Historic palace",fr:"Palais historique",price:2000000000,rent:2200000},
-  {id:"re12",icon:"🗼",en:"Landmark tower",fr:"Tour emblématique",price:6000000000,rent:6500000},
-  {id:"re13",icon:"🏟️",en:"Mega stadium complex",fr:"Complexe de stades",price:18000000000,rent:19000000},
-  {id:"re14",icon:"🌃",en:"Smart city district",fr:"Quartier intelligent",price:55000000000,rent:55000000},
-  {id:"re15",icon:"🌌",en:"Island megaproject",fr:"Mégaprojet insulaire",price:250000000000,rent:260000000}
-];
-const RE_UPS=[
-  {k:"paint",en:"Renovation",fr:"Rénovation",mult:0.15,base:0.2},
-  {k:"energy",en:"Energy efficiency",fr:"Efficacité énergétique",mult:0.12,base:0.25},
-  {k:"security",en:"Security system",fr:"Système de sécurité",mult:0.10,base:0.3},
-  {k:"amen",en:"Amenities",fr:"Équipements",mult:0.18,base:0.35}
-];
-const RE_UP_MAX=5;
-let reSortMode="asc";
-function reOwned(id){return S.re[id]||0}
-function reLevel(id,k){return (S.reLv[id]&&S.reLv[id][k])||0}
-function reUpCost(re,u){return Math.floor(re.price*u.base*Math.pow(1.6,reLevel(re.id,u.k)))}
-function reRentOne(re){
-  let m=1;
-  RE_UPS.forEach(u=>{m+=u.mult*reLevel(re.id,u.k)});
-  return re.rent*m;
-}
-function reIncome(){
-  return RE.reduce((s,re)=>s+reOwned(re.id)*reRentOne(re),0);
-}
-function buyRE(re){
-  if(S.money<re.price)return;
-  S.money-=re.price;
-  S.re[re.id]=reOwned(re.id)+1;
-  S.stats.reBought++;S.stats.bought++;
-  click();save();update();checkAch();renderGoods();
-}
-function buyREUp(re,u){
-  const lv=reLevel(re.id,u.k);
-  if(lv>=RE_UP_MAX||reOwned(re.id)<1)return;
-  const cost=reUpCost(re,u);
-  if(S.money<cost)return;
-  S.money-=cost;
-  if(!S.reLv[re.id])S.reLv[re.id]={};
-  S.reLv[re.id][u.k]=lv+1;
-  click();save();update();checkAch();renderGoods();
-}
 
-// ============ VÉHICULES ============
-const CARS=[
-  {id:"c1",icon:"🚗",en:"Compact Hatch",fr:"Citadine",price:12000},
-  {id:"c2",icon:"🚙",en:"Family SUV",fr:"SUV familial",price:32000},
-  {id:"c3",icon:"🚕",en:"Yellow Cab",fr:"Taxi jaune",price:28000},
-  {id:"c4",icon:"🚐",en:"Minivan",fr:"Monospace",price:35000},
-  {id:"c5",icon:"🛻",en:"Pickup Truck",fr:"Pick-up",price:45000},
-  {id:"c6",icon:"🏎️",en:"Sport Coupe",fr:"Coupé sportif",price:65000},
-  {id:"c7",icon:"🚘",en:"Sedan",fr:"Berline",price:38000},
-  {id:"c8",icon:"🚖",en:"Ride-share Sedan",fr:"Berline VTC",price:42000},
-  {id:"c9",icon:"🚓",en:"Patrol Car",fr:"Voiture de patrouille",price:52000},
-  {id:"c10",icon:"🚑",en:"Ambulance Van",fr:"Ambulance",price:120000},
-  {id:"c11",icon:"🚒",en:"Fire Engine",fr:"Camion de pompiers",price:350000},
-  {id:"c12",icon:"🏁",en:"Race Car",fr:"Voiture de course",price:250000},
-  {id:"c13",icon:"🚜",en:"Tractor",fr:"Tracteur",price:90000},
-  {id:"c14",icon:"🚚",en:"Delivery Truck",fr:"Camion de livraison",price:110000},
-  {id:"c15",icon:"🚛",en:"Semi Truck",fr:"Semi-remorque",price:180000},
-  {id:"c16",icon:"🚌",en:"City Bus",fr:"Bus urbain",price:300000},
-  {id:"c17",icon:"🚍",en:"Coach Bus",fr:"Autocar",price:420000},
-  {id:"c18",icon:"🚗",en:"Electric Sedan",fr:"Berline électrique",price:55000},
-  {id:"c19",icon:"🏎️",en:"Hypercar",fr:"Hypercar",price:2500000},
-  {id:"c20",icon:"🚙",en:"Armored Limo",fr:"Limousine blindée",price:850000}
-];
-const AIRCRAFT=[
-  {id:"a1",icon:"🛩️",en:"Single-engine Piper",fr:"Piper monomoteur",price:250000},
-  {id:"a2",icon:"✈️",en:"Twin-prop Commuter",fr:"Bimoteur navette",price:1500000},
-  {id:"a3",icon:"🛫",en:"Business Jet",fr:"Jet d'affaires",price:9000000},
-  {id:"a4",icon:"🚁",en:"Light Helicopter",fr:"Hélicoptère léger",price:1200000},
-  {id:"a5",icon:"🚁",en:"Heavy Helicopter",fr:"Hélicoptère lourd",price:12000000},
-  {id:"a6",icon:"✈️",en:"Regional Airliner",fr:"Avion régional",price:45000000},
-  {id:"a7",icon:"✈️",en:"Narrow-body Airliner",fr:"Monocouloir",price:90000000},
-  {id:"a8",icon:"✈️",en:"Wide-body Airliner",fr:"Biréacteur long-courrier",price:250000000},
-  {id:"a9",icon:"🛸",en:"Cargo Freighter",fr:"Avion cargo",price:400000000},
-  {id:"a10",icon:"🚀",en:"Private Spaceplane",fr:"Avion spatial privé",price:3000000000}
-];
-const BOATS=[
-  {id:"b1",icon:"🚤",en:"Speedboat",fr:"Vedette",price:40000},
-  {id:"b2",icon:"⛵",en:"Sailboat",fr:"Voilier",price:85000},
-  {id:"b3",icon:"🛥️",en:"Motor Yacht",fr:"Yacht à moteur",price:900000},
-  {id:"b4",icon:"🚢",en:"Ferry",fr:"Ferry",price:20000000},
-  {id:"b5",icon:"🛳️",en:"Cruise Liner",fr:"Paquebot",price:800000000},
-  {id:"b6",icon:"⛴️",en:"Cargo Ship",fr:"Cargo",price:60000000},
-  {id:"b7",icon:"🛶",en:"Super Yacht",fr:"Superyacht",price:300000000}
-];
-const VEH_GROUPS={cars:CARS,aircraft:AIRCRAFT,boats:BOATS};
-let vehCat="cars";
-function vehOwned(id){return S.veh[id]||0}
-function buyVeh(v){
-  if(S.money<v.price)return;
-  S.money-=v.price;
-  S.veh[v.id]=vehOwned(v.id)+1;
-  S.stats.vehBought++;S.stats.bought++;
-  click();save();update();checkAch();renderGoods();
-}
-
-// ============ ONGLET BIENS (navigation) ============
-let goodsView="root"; // root | re | veh | vehCat
+// ============ RENDU PAGE BIENS ============
+// goodsView : "root" | "re" (immobilier) | "veh" (catégories) | "vehList" (véhicules d'une catégorie)
+let goodsView="root",goodsCat=null;
+const VEH_CATS=["cars","aircraft","boats"];
 function renderGoods(){
   const root=document.getElementById("goodsRoot");
+  const back=()=>'<button class="back" data-gback="1">'+t("back")+'</button>';
+
+  // ---- Menu racine : 2 blocs ----
   if(goodsView==="root"){
     root.innerHTML=
-      '<div class="blockCard" data-gv="re">🏘️ '+t("realestate")+'<small>'+RE.filter(r=>reOwned(r.id)>0).length+'/'+RE.length+' • '+t("rent")+': '+fmt(reIncome())+' '+t("persec")+'</small></div>'+
-      '<div class="blockCard" data-gv="veh">🚘 '+t("vehicles")+'<small>'+Object.values(S.veh).reduce((a,b)=>a+b,0)+' '+t("pVehB").toLowerCase()+'</small></div>';
+      '<div class="blockCard" data-gv="re">🏠 '+t("realestate")+'<small>'+RE.reduce((s,r)=>s+reOwned(r.id),0)+' '+t("owned")+' • '+fmt(reIncome())+' '+t("persec")+'</small></div>'+
+      '<div class="blockCard" data-gv="veh">🚗 '+t("vehicles")+'<small>'+VEH.reduce((s,v)=>s+vehOwned(v.id),0)+' '+t("owned")+'</small></div>';
     root.querySelectorAll("[data-gv]").forEach(b=>b.onclick=()=>{goodsView=b.dataset.gv;renderGoods()});
     return;
   }
+
+  // ---- Immobilier ----
   if(goodsView==="re"){
-    const list=RE.slice().sort((a,b)=>reSortMode==="asc"?a.price-b.price:b.price-a.price);
-    let h='<button class="back" data-gb="root">'+t("back")+'</button>';
-    h+='<div class="toolbar"><div class="sec" style="margin:0">'+t("realestate")+'</div><button class="sortBtn" id="sortBtn">'+(reSortMode==="asc"?t("sortAsc"):t("sortDesc"))+'</button></div>';
-    list.forEach(re=>{
-      const n=reOwned(re.id);
-      h+='<div class="item"><div style="flex:1"><div class="t">'+re.icon+' '+nm(re)+' <small>×'+n+'</small></div>'+
-        '<div class="d">'+t("price")+': '+fmt(re.price)+' • '+t("rent")+': '+fmt(reRentOne(re))+' '+t("persec")+'</div>'+
-        (n>0?RE_UPS.map(u=>'<div class="d" style="margin-top:4px">'+nm(u)+' '+reLevel(re.id,u.k)+'/'+RE_UP_MAX+' <button data-reup="'+re.id+'|'+u.k+'" '+(reLevel(re.id,u.k)>=RE_UP_MAX||S.money<reUpCost(re,u)?"disabled":"")+' style="padding:3px 8px;margin-left:6px">'+(reLevel(re.id,u.k)>=RE_UP_MAX?t("max"):fmt(reUpCost(re,u)))+'</button></div>').join(""):"")+
-        '</div><button data-rebuy="'+re.id+'" '+(S.money<re.price?"disabled":"")+'>'+t("buy")+'</button></div>';
+    const list=RE.slice();
+    if(S.reSort==="desc")list.reverse();
+    let h=back()+'<div class="toolbar"><div class="sec" style="margin:0">'+t("realestate")+'</div><button class="sortBtn" data-sort="1">'+(S.reSort==="asc"?t("sortAsc"):t("sortDesc"))+'</button></div>';
+    list.forEach(r=>{
+      const p=rePrice(r);
+      h+='<div class="item"><div><div class="t">'+nm(r)+' <small>('+t("owned")+': '+reOwned(r.id)+')</small></div><div class="d">'+t("price")+': '+fmt(p)+' • '+t("rent")+': '+fmt(r.rent)+' '+t("persec")+'</div></div><button data-rbuy="'+r.id+'" '+(S.money<p?"disabled":"")+'>'+t("buy")+'</button></div>';
     });
     root.innerHTML=h;
-    root.querySelector('[data-gb="root"]').onclick=()=>{goodsView="root";renderGoods()};
-    document.getElementById("sortBtn").onclick=()=>{reSortMode=reSortMode==="asc"?"desc":"asc";renderGoods()};
-    root.querySelectorAll("[data-rebuy]").forEach(b=>b.onclick=()=>buyRE(RE.find(r=>r.id===b.dataset.rebuy)));
-    root.querySelectorAll("[data-reup]").forEach(b=>b.onclick=()=>{
-      const [id,k]=b.dataset.reup.split("|");
-      buyREUp(RE.find(r=>r.id===id),RE_UPS.find(u=>u.k===k));
-    });
+    root.querySelector("[data-gback]").onclick=()=>{goodsView="root";renderGoods()};
+    root.querySelector("[data-sort]").onclick=()=>{S.reSort=S.reSort==="asc"?"desc":"asc";save();renderGoods()};
+    root.querySelectorAll("[data-rbuy]").forEach(b=>b.onclick=()=>buyRe(RE_BY_ID[b.dataset.rbuy]));
     return;
   }
+
+  // ---- Catégories véhicules ----
   if(goodsView==="veh"){
-    root.innerHTML=
-      '<button class="back" data-gb="root">'+t("back")+'</button>'+
-      '<div class="blockCard" data-vc="cars">🚗 '+t("cars")+'<small>'+CARS.filter(v=>vehOwned(v.id)>0).length+'/'+CARS.length+'</small></div>'+
-      '<div class="blockCard" data-vc="aircraft">✈️ '+t("aircraft")+'<small>'+AIRCRAFT.filter(v=>vehOwned(v.id)>0).length+'/'+AIRCRAFT.length+'</small></div>'+
-      '<div class="blockCard" data-vc="boats">🛥️ '+t("boats")+'<small>'+BOATS.filter(v=>vehOwned(v.id)>0).length+'/'+BOATS.length+'</small></div>';
-    root.querySelector('[data-gb="root"]').onclick=()=>{goodsView="root";renderGoods()};
-    root.querySelectorAll("[data-vc]").forEach(b=>b.onclick=()=>{goodsView="vehCat";vehCat=b.dataset.vc;renderGoods()});
-    return;
-  }
-  if(goodsView==="vehCat"){
-    const list=VEH_GROUPS[vehCat];
-    let h='<button class="back" data-gb="veh">'+t("back")+'</button>';
-    h+='<div class="sec">'+t(vehCat)+'</div>';
-    list.forEach(v=>{
-      const n=vehOwned(v.id);
-      h+='<div class="item"><div><div class="t">'+v.icon+' '+nm(v)+' <small>×'+n+'</small></div><div class="d">'+t("price")+': '+fmt(v.price)+'</div></div><button data-vbuy="'+v.id+'" '+(S.money<v.price?"disabled":"")+'>'+t("buy")+'</button></div>';
+    let h=back()+'<div class="sec">'+t("vehicles")+'</div>';
+    VEH_CATS.forEach(cat=>{
+      const n=VEH.filter(v=>v.cat===cat).reduce((s,v)=>s+vehOwned(v.id),0);
+      h+='<div class="blockCard" data-vcat="'+cat+'">'+t(cat)+'<small>'+n+' '+t("owned")+'</small></div>';
     });
     root.innerHTML=h;
-    root.querySelector('[data-gb="veh"]').onclick=()=>{goodsView="veh";renderGoods()};
-    root.querySelectorAll("[data-vbuy]").forEach(b=>b.onclick=()=>{
-      const all=[...CARS,...AIRCRAFT,...BOATS];
-      buyVeh(all.find(v=>v.id===b.dataset.vbuy));
+    root.querySelector("[data-gback]").onclick=()=>{goodsView="root";renderGoods()};
+    root.querySelectorAll("[data-vcat]").forEach(b=>b.onclick=()=>{goodsCat=b.dataset.vcat;goodsView="vehList";renderGoods()});
+    return;
+  }
+
+  // ---- Liste véhicules d'une catégorie ----
+  if(goodsView==="vehList"){
+    let h=back()+'<div class="sec">'+t(goodsCat)+'</div>';
+    VEH.filter(v=>v.cat===goodsCat).forEach(v=>{
+      const p=vehPrice(v);
+      h+='<div class="item"><div><div class="t">'+nm(v)+' <small>('+t("owned")+': '+vehOwned(v.id)+')</small></div><div class="d">'+t("price")+': '+fmt(p)+' • +'+v.mus+' '+t("persec")+' '+t("income")+' 🏛️</div></div><button data-vbuy="'+v.id+'" '+(S.money<p?"disabled":"")+'>'+t("buy")+'</button></div>';
     });
+    root.innerHTML=h;
+    root.querySelector("[data-gback]").onclick=()=>{goodsView="veh";renderGoods()};
+    root.querySelectorAll("[data-vbuy]").forEach(b=>b.onclick=()=>buyVeh(VEH_BY_ID[b.dataset.vbuy]));
   }
 }
-  </script>
-<script>
-// ============ PROFIL ============
-function renderProfile(){
-  const total=S.total||1;
-  const cardPct=S.stats.byCard/total*100;
-  const compPct=S.stats.byComp/total*100;
-  const rePct=S.stats.byRe/total*100;
-  const vehPct=S.stats.byVeh/total*100;
-  const other=Math.max(0,100-cardPct-compPct-rePct-vehPct);
-  const row=(label,val,pct)=>'<div class="stat"><span>'+label+'</span><span>'+fmt(val)+' <small style="opacity:.6">('+pct.toFixed(1)+'% '+t("pShare")+')</small></span></div>'+
-    '<div class="bar"><div style="width:'+Math.min(100,pct).toFixed(1)+'%"></div></div>';
-  let h='';
-  h+='<div class="item"><div><div class="t">'+t("pTotal")+'</div><div class="d" style="font-size:22px;color:var(--accent)">'+fmt(S.total)+'</div></div></div>';
-  h+='<div class="sec">'+t("pTotal")+' — %</div>';
-  h+=row(t("pCard"),S.stats.byCard,cardPct);
-  h+=row(t("pComp"),S.stats.byComp,compPct);
-  h+=row(t("pRe"),S.stats.byRe,rePct);
-  h+=row(t("pVeh"),S.stats.byVeh,vehPct);
-  h+=row(t("pOther"),Math.max(0,S.total-S.stats.byCard-S.stats.byComp-S.stats.byRe-S.stats.byVeh),other);
-  h+='<div class="sec">'+t("pBought")+'</div>';
-  h+='<div class="stat"><span>'+t("pBought")+'</span><span>'+S.stats.bought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pCompB")+'</span><span>'+S.stats.compBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pReB")+'</span><span>'+S.stats.reBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pVehB")+'</span><span>'+S.stats.vehBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pClicks")+'</span><span>'+S.clicks+'</span></div>';
-  h+='<div class="stat"><span>'+t("pAch")+'</span><span>'+Object.keys(S.ach).length+'/'+ACH.length+'</span></div>';
-  document.getElementById("profList").innerHTML=h;
-}
-// Comptabilisation des revenus par source (appelée à chaque gain passif)
-function addIncome(src,n){
-  if(n<=0)return;
-  S.total+=n;
-  S.stats[src]=(S.stats[src]||0)+n;
-}
-
-// ============ SKINS ============
-function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
-function renderSkinSel(){
-  const sel=document.getElementById("skinSel");
-  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
-  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
-  sel.value=S.skinChoice;
-}
-function applySkin(){
-  const s=currentSkin(),c=document.getElementById("card");
-  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
-  document.getElementById("pattern").style.background=s.pat;
-  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
-  document.getElementById("money").style.color=s.acc;
-}
-
-// ============ SON ============
-let AC=null;
-function getAC(){
-  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-  if(AC.state==="suspended"&&!document.hidden)AC.resume();
-  return AC;
-}
-function click(){
-  if(!S.snd)return;
-  try{
-    const a=getAC();
-    const o=a.createOscillator(),g=a.createGain();
-    o.frequency.value=520+Math.random()*60;o.type="triangle";
-    g.gain.setValueAtTime(.06,a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
-    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
-  }catch(e){}
-}
-const CHORDS=[[261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]];
-const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
-let chordIdx=0,melIdx=0,musicStarted=false,musicGain=null,musicTimer=null;
-function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
-function playNote(freq,start,dur,type,peak){
-  const a=AC,o=a.createOscillator(),g=a.createGain();
-  o.type=type;o.frequency.value=freq;
-  g.gain.setValueAtTime(0,start);
-  g.gain.linearRampToValueAtTime(peak,start+Math.min(0.4,dur*0.3));
-  g.gain.linearRampToValueAtTime(0,start+dur);
-  o.connect(g);g.connect(musicGain);
-  o.start(start);o.stop(start+dur+0.05);
-}
-function playChord(){
-  if(!S.mus||!AC||document.hidden||!musicGain)return;
-  try{
-    const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
-    ch.forEach(f=>playNote(f,now,3.8,"triangle",0.18));
-    for(let i=0;i<2;i++){
-      const f=MELODY[melIdx%MELODY.length];melIdx++;
-      playNote(f,now+0.3+i*1.8,1.2,"sine",0.14);
-    }
-  }catch(e){}
-}
-function startMusic(){
-  if(musicStarted)return;
-  try{
-    const a=getAC();
-    musicGain=a.createGain();
-    musicGain.gain.value=musicVol();
-    musicGain.connect(a.destination);
-    musicStarted=true;
-    playChord();
-    musicTimer=setInterval(playChord,4000);
-  }catch(e){}
-}
-function updateMusicVol(){
-  if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
-}
-["pointerdown","touchstart","keydown"].forEach(ev=>
-  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
-document.addEventListener("visibilitychange",()=>{
-  if(!AC)return;
-  if(document.hidden){
-    if(musicGain){musicGain.gain.cancelScheduledValues(AC.currentTime);musicGain.gain.setValueAtTime(0,AC.currentTime)}
-    AC.suspend();
-  }else{
-    if(AC.state==="suspended")AC.resume();
-    if(musicGain){
-      const target=musicVol();
-      musicGain.gain.cancelScheduledValues(AC.currentTime);
-      musicGain.gain.setValueAtTime(0,AC.currentTime);
-      musicGain.gain.linearRampToValueAtTime(target,AC.currentTime+1.5);
-    }
-  }
-});
-
-// ============ SUCCÈS ============
-const ACH=[];
-[100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
-  ACH.push({id:"m"+v,en:"Hold "+fmt(v),fr:"Avoir "+fmt(v)+" en compte",gem:1+i,test:()=>S.money>=v}));
-[10,100,500,1000,5000].forEach((v,i)=>
-  ACH.push({id:"c"+v,en:"Click "+v+" times",fr:"Cliquer "+v+" fois",gem:1+i,test:()=>S.clicks>=v}));
-ACH.push({id:"um5",en:"Gold Swipe",fr:"Glissade dorée",gem:3,test:()=>S.ups.mult>=1});
-ACH.push({id:"ul10",en:"Lucky Tap",fr:"Clic chanceux",gem:3,test:()=>S.ups.lucky>=1});
-ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
-ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
-COMPANIES.forEach((c,i)=>{
-  ACH.push({id:"co"+c.id,en:"Own a "+c.en,fr:"Posséder : "+nm(c),gem:2+Math.min(i,4),test:()=>compCount(c.id)>=1});
-});
-RE.forEach((re,i)=>{
-  ACH.push({id:"re"+re.id,en:"Own "+re.en,fr:"Posséder : "+nm(re),gem:2+Math.min(i,5),test:()=>reOwned(re.id)>=1});
-});
-SKINS.forEach((s,i)=>{
-  if(i===0)return;
-  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,test:()=>S.money>=s.at||S.total>=s.at});
-});
-function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
-function checkAch(){
-  let ch=false;
-  ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;ch=true}});
-  if(ch)renderAch();
-  updateBadge();
-}
-function updateBadge(){
-  const n=readyCount(),b=document.getElementById("badge");
-  b.style.display=n>0?"block":"none";b.textContent=n;
-}
-function claim(id){
-  const a=ACH.find(x=>x.id===id);
-  if(a&&S.ach[id]&&!S.claimed[id]){
-    S.claimed[id]=1;S.gems+=a.gem;
-    if(id.startsWith("skin"))S.skinChoice=parseInt(id.slice(4),10);
-    click();save();
-  }
-}
-function renderAch(){
-  const n=readyCount(),ca=document.getElementById("claimAll");
-  ca.style.display=n>0?"block":"none";
-  ca.textContent=t("claimall")+" ("+n+")";
-  const order=a=>S.ach[a.id]&&!S.claimed[a.id]?0:(!S.ach[a.id]?1:2);
-  const list=ACH.map((a,i)=>({a,i})).sort((x,y)=>order(x.a)-order(y.a)||x.i-y.i).map(o=>o.a);
-  document.getElementById("achList").innerHTML=list.map(a=>{
-    const name=S.lang==="fr"?a.fr:a.en;
-    const ready=S.ach[a.id]&&!S.claimed[a.id],done=S.claimed[a.id];
-    return '<div class="item ach '+(done?"done":"")+(ready?" ready":"")+'"><div><div class="t">'+name+'</div></div><div>'+
-      (ready?'<button data-c="'+a.id+'">'+t("claim")+' +'+a.gem+' 💎</button>':(done?"✔ ":"")+'+'+a.gem+' 💎')+'</div></div>';
-  }).join("");
-  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{
-    claim(b.dataset.c);renderAch();renderSkinSel();applySkin();update();
-  });
-  updateBadge();
-}
-
-// ============ UI ============
-function addMoney(n){S.money+=n}
-function renderUps(){
-  document.getElementById("upsList").innerHTML=Object.keys(UPS).map(k=>{
-    const mx=isMax(k);
-    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
-  }).join("");
-  document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
-    const k=b.dataset.u,c=cost(k);
-    if(!isMax(k)&&S.money>=c){S.money-=c;S.ups[k]++;click();update();checkAch();save()}
-  });
-}
-function update(){
-  document.getElementById("money").textContent=fmt(S.money);
-  document.getElementById("info").textContent=fmt(perClick())+" "+t("perclick")+" • "+fmt(perSecond())+" "+t("persec");
-  document.getElementById("gems").textContent="💎 "+S.gems;
-  applySkin();renderUps();
-}
-function applyLang(){
-  document.getElementById("nGame").textContent=t("card");
-  document.getElementById("nComp").textContent=t("comp");
-  document.getElementById("nGoods").textContent=t("goods");
-  document.getElementById("hAch").textContent=t("ach");
-  document.getElementById("nProf").textContent=t("prof");
-  document.getElementById("nSet").textContent=t("set");
-  document.getElementById("hUp").textContent=t("up");
-  document.getElementById("lLang").textContent=t("lang");
-  document.getElementById("lSnd").textContent=t("snd");
-  document.getElementById("lMus").textContent=t("mus");
-  document.getElementById("lVol").textContent=t("vol");
-  document.getElementById("lSkin").textContent=t("skin");
-  document.getElementById("resetBtn").textContent=t("res");
-  const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
-  so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
-  document.getElementById("langSel").value=S.lang;
-  document.getElementById("sndSel").value=S.snd;
-  document.getElementById("musSel").value=S.mus;
-  document.getElementById("volRange").value=S.vol;
-  renderSkinSel();renderAch();update();renderCompanies();renderGoods();renderProfile();
-}
-function updateStickyHeader(page){document.body.classList.toggle("on-card",page==="game")}
-      </script>
-<script>
-// ============ RESET ============
-let saveTimer=null;
-function resetGame(){
-  if(!window.confirm(t("confirm")))return;
-  clearInterval(saveTimer);
-  Object.keys(localStorage).filter(k=>k.startsWith("empireTycoon")).forEach(k=>localStorage.removeItem(k));
-  location.reload();
-}
-
-// ============ EVENTS ============
-document.getElementById("card").addEventListener("pointerdown",e=>{
-  let g=perClick(),lucky=false;
-  if(Math.random()<luckyChance()){g*=5;lucky=true}
-  S.clicks++;click();
-  addIncome("byCard",g);
-  const f=document.createElement("div");
-  f.className="float"+(lucky?" lucky":"");
-  f.textContent="+"+fmt(g)+(lucky?" ★":"");
-  f.style.left=(e.clientX-20)+"px";
-  f.style.top=(e.clientY-30)+"px";
-  document.body.appendChild(f);
-  setTimeout(()=>f.remove(),900);
-  update();checkAch();
-});
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
-  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  document.getElementById(b.dataset.p).classList.add("active");
-  if(b.dataset.p==="comp"){openComp=null;renderCompanies()}
-  if(b.dataset.p==="goods"){goodsView="root";renderGoods()}
-  if(b.dataset.p==="profile")renderProfile();
-  updateStickyHeader(b.dataset.p);
-});
-document.getElementById("claimAll").onclick=()=>{
-  ACH.forEach(a=>claim(a.id));
-  renderAch();renderSkinSel();applySkin();update();
-};
-<script>
-// ============ PROFIL ============
-function renderProfile(){
-  const total=S.total||1;
-  const cardPct=S.stats.byCard/total*100;
-  const compPct=S.stats.byComp/total*100;
-  const rePct=S.stats.byRe/total*100;
-  const vehPct=S.stats.byVeh/total*100;
-  const otherVal=Math.max(0,S.total-S.stats.byCard-S.stats.byComp-S.stats.byRe-S.stats.byVeh);
-  const otherPct=otherVal/total*100;
-  const row=(label,val,pct)=>'<div class="stat"><span>'+label+'</span><span>'+fmt(val)+' <small style="opacity:.6">('+pct.toFixed(1)+'%)</small></span></div>'+
-    '<div class="bar"><div style="width:'+Math.min(100,pct).toFixed(1)+'%"></div></div>';
-  let h='';
-  h+='<div class="item"><div><div class="t">'+t("pTotal")+'</div><div class="d" style="font-size:22px;color:var(--accent)">'+fmt(S.total)+'</div></div></div>';
-  h+='<div class="sec">'+t("pShare")+'</div>';
-  h+=row(t("pCard"),S.stats.byCard,cardPct);
-  h+=row(t("pComp"),S.stats.byComp,compPct);
-  h+=row(t("pRe"),S.stats.byRe,rePct);
-  h+=row(t("pVeh"),S.stats.byVeh,vehPct);
-  h+=row(t("pOther"),otherVal,otherPct);
-  h+='<div class="sec">'+t("pBought")+'</div>';
-  h+='<div class="stat"><span>'+t("pBought")+'</span><span>'+S.stats.bought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pCompB")+'</span><span>'+S.stats.compBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pReB")+'</span><span>'+S.stats.reBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pVehB")+'</span><span>'+S.stats.vehBought+'</span></div>';
-  h+='<div class="stat"><span>'+t("pClicks")+'</span><span>'+S.clicks+'</span></div>';
-  h+='<div class="stat"><span>'+t("pAch")+'</span><span>'+Object.keys(S.ach).length+'/'+ACH.length+'</span></div>';
-  document.getElementById("profList").innerHTML=h;
-}
-// Comptabilise les revenus par source (appelée à chaque gain passif)
-function addIncome(src,n){
-  if(n<=0)return;
-  S.total+=n;
-  S.stats[src]=(S.stats[src]||0)+n;
-}
-
-// ============ SKINS ============
-function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
-function renderSkinSel(){
-  const sel=document.getElementById("skinSel");
-  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
-  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
-  sel.value=S.skinChoice;
-}
-function applySkin(){
-  const s=currentSkin(),c=document.getElementById("card");
-  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
-  document.getElementById("pattern").style.background=s.pat;
-  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
-  document.getElementById("money").style.color=s.acc;
-}
-
-// ============ SON ============
-let AC=null;
-function getAC(){
-  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-  if(AC.state==="suspended"&&!document.hidden)AC.resume();
-  return AC;
-}
-function click(){
-  if(!S.snd)return;
-  try{
-    const a=getAC();
-    const o=a.createOscillator(),g=a.createGain();
-    o.frequency.value=520+Math.random()*60;o.type="triangle";
-    g.gain.setValueAtTime(.06,a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
-    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
-  }catch(e){}
-}
-const CHORDS=[[261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]];
-const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
-let chordIdx=0,melIdx=0,musicStarted=false,musicGain=null,musicTimer=null;
-function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
-function playNote(freq,start,dur,type,peak){
-  const a=AC,o=a.createOscillator(),g=a.createGain();
-  o.type=type;o.frequency.value=freq;
-  g.gain.setValueAtTime(0,start);
-  g.gain.linearRampToValueAtTime(peak,start+Math.min(0.4,dur*0.3));
-  g.gain.linearRampToValueAtTime(0,start+dur);
-  o.connect(g);g.connect(musicGain);
-  o.start(start);o.stop(start+dur+0.05);
-}
-function playChord(){
-  if(!S.mus||!AC||document.hidden||!musicGain)return;
-  try{
-    const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
-    ch.forEach(f=>playNote(f,now,3.8,"triangle",0.18));
-    for(let i=0;i<2;i++){
-      const f=MELODY[melIdx%MELODY.length];melIdx++;
-      playNote(f,now+0.3+i*1.8,1.2,"sine",0.14);
-    }
-  }catch(e){}
-}
-function startMusic(){
-  if(musicStarted)return;
-  try{
-    const a=getAC();
-    musicGain=a.createGain();
-    musicGain.gain.value=musicVol();
-    musicGain.connect(a.destination);
-    musicStarted=true;
-    playChord();
-    musicTimer=setInterval(playChord,4000);
-  }catch(e){}
-}
-function updateMusicVol(){
-  if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
-}
-["pointerdown","touchstart","keydown"].forEach(ev=>
-  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
-document.addEventListener("visibilitychange",()=>{
-  if(!AC)return;
-  if(document.hidden){
-    if(musicGain){musicGain.gain.cancelScheduledValues(AC.currentTime);musicGain.gain.setValueAtTime(0,AC.currentTime)}
-    AC.suspend();
-  }else{
-    if(AC.state==="suspended")AC.resume();
-    if(musicGain){
-      const target=musicVol();
-      musicGain.gain.cancelScheduledValues(AC.currentTime);
-      musicGain.gain.setValueAtTime(0,AC.currentTime);
-      musicGain.gain.linearRampToValueAtTime(target,AC.currentTime+1.5);
-    }
-  }
-});
 </script>
 <script>
 // ============ SUCCÈS ============
@@ -861,7 +566,7 @@ function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length
 function checkAch(){
   let ch=false;
   ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;ch=true}});
-  if(ch)renderAch();
+  if(ch&&document.getElementById("ach").classList.contains("active"))renderAch();
   updateBadge();
 }
 function updateBadge(){
@@ -895,7 +600,7 @@ function renderAch(){
 }
 
 // ============ UI ============
-function addMoney(n){S.money+=n}
+function click_upgrade_guard(){}
 function renderUps(){
   document.getElementById("upsList").innerHTML=Object.keys(UPS).map(k=>{
     const mx=isMax(k);
@@ -935,8 +640,7 @@ function applyLang(){
   renderSkinSel();renderAch();update();renderCompanies();renderGoods();renderProfile();
 }
 function updateStickyHeader(page){document.body.classList.toggle("on-card",page==="game")}
-</script>
-<script>
+
 // ============ RESET ============
 let saveTimer=null;
 function resetGame(){
@@ -946,7 +650,7 @@ function resetGame(){
   location.reload();
 }
 
-// ============ EVENTS ============
+// ============ ÉVÉNEMENTS ============
 document.getElementById("card").addEventListener("pointerdown",e=>{
   let g=perClick(),lucky=false;
   if(Math.random()<luckyChance()){g*=5;lucky=true}
@@ -969,6 +673,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.p==="comp"){openComp=null;renderCompanies()}
   if(b.dataset.p==="goods"){goodsView="root";renderGoods()}
   if(b.dataset.p==="profile")renderProfile();
+  if(b.dataset.p==="ach")renderAch();
   updateStickyHeader(b.dataset.p);
 });
 document.getElementById("claimAll").onclick=()=>{
@@ -985,10 +690,11 @@ document.getElementById("musSel").onchange=e=>{
 document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
 document.getElementById("skinSel").onchange=e=>{S.skinChoice=+e.target.value;applySkin();save()};
 document.getElementById("resetBtn").addEventListener("click",resetGame);
-
-// ============ LOOP ============
+</script>
+<script>
+// ============ BOUCLE PRINCIPALE ============
 setInterval(()=>{
-  const cr=compRevenueTick(),rr=reIncome(),ps=perSecond();
+  const cr=companyRev(),rr=reIncome();
   if(cr>0)addIncome("byComp",cr);
   if(rr>0)addIncome("byRe",rr);
   if(document.getElementById("comp").classList.contains("active"))renderCompanies();
