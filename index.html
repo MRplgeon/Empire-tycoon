@@ -79,12 +79,14 @@ h3{margin:6px 0 12px}
 <select id="musSel"><option value="1">On</option><option value="0">Off</option></select></div>
 <div class="item"><span id="lVol">Music volume</span>
 <input type="range" id="volRange" min="0" max="100" step="1"></div>
+<div class="item"><span id="lSkin">Card skin</span>
+<select id="skinSel"></select></div>
 <div class="item"><span id="lRes">Reset game</span><button class="btnr" id="resetBtn">Reset</button></div>
 </div>
 
 <script>
 // ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skin:0};
+const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skinsUnlocked:[0],skinChoice:-1};
 let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
 for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
@@ -97,10 +99,10 @@ function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 
 // ============ TEXTES ============
 const TX={
-en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",
+en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",
 u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",
 u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
-fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",
+fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",
 u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",
 u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
 };
@@ -116,12 +118,33 @@ const SKINS=[
 {n:"DIAMOND",at:100000000000,c1:"#3aa0c8",c2:"#d8f6ff",a:"#7fe4ff",b1:"#06202c",b2:"#0e3a4c"},
 {n:"EMPIRE",at:10000000000000,c1:"#5a1a7a",c2:"#ff6ad5",a:"#ff9be8",b1:"#1a0626",b2:"#33104a"}
 ];
+// Débloque définitivement les skins selon le total gagné (ne se perd jamais)
+function unlockSkins(){
+  let ch=false;
+  SKINS.forEach((s,i)=>{
+    if(S.total>=s.at&&!S.skinsUnlocked.includes(i)){S.skinsUnlocked.push(i);ch=true}
+  });
+  if(ch)S.skinsUnlocked.sort((a,b)=>a-b);
+  return ch;
+}
+// Skin affiché : le choix du joueur s'il est débloqué, sinon le meilleur débloqué
+function currentSkinIdx(){
+  if(S.skinChoice>=0&&S.skinsUnlocked.includes(S.skinChoice))return S.skinChoice;
+  return Math.max(...S.skinsUnlocked);
+}
 function applySkin(){
-  let idx=0;SKINS.forEach((s,i)=>{if(S.total>=s.at)idx=i});
-  S.skin=idx;const s=SKINS[idx],r=document.documentElement.style;
+  unlockSkins();
+  const idx=currentSkinIdx(),s=SKINS[idx],r=document.documentElement.style;
+  S.skin=idx;
   r.setProperty("--card1",s.c1);r.setProperty("--card2",s.c2);r.setProperty("--accent",s.a);
   r.setProperty("--bg1",s.b1);r.setProperty("--bg2",s.b2);
   document.getElementById("cName").textContent=s.n;
+}
+function renderSkinSel(){
+  const sel=document.getElementById("skinSel");
+  const cur=currentSkinIdx();
+  sel.innerHTML=S.skinsUnlocked.map(i=>'<option value="'+i+'">'+SKINS[i].n+'</option>').join("");
+  sel.value=cur;
 }
 
 // ============ UPGRADES ============
@@ -186,7 +209,6 @@ function playNote(freq,start,dur,type,peak){
   o.start(start);o.stop(start+dur+0.05);
 }
 function playChord(){
-  // Ne joue rien si la musique est coupée ou si l'onglet est caché
   if(!S.mus||!AC||document.hidden||!musicGain)return;
   try{
     const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
@@ -213,7 +235,6 @@ function startMusic(){
 function updateMusicVol(){
   if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
 }
-// Démarre au premier toucher (exigé par les navigateurs)
 ["pointerdown","touchstart","keydown"].forEach(ev=>
   document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
 
@@ -237,21 +258,18 @@ document.addEventListener("visibilitychange",()=>{
   }
 });
 
-// ============ ACHIEVEMENTS ============
+// ============ ACHIEVEMENTS (globaux uniquement) ============
 const ACH=[];
 [100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
   ACH.push({id:"m"+v,en:"Earn "+fmt(v),fr:"Gagner "+fmt(v),gem:1+i,test:()=>S.total>=v}));
 [10,100,500,1000,5000].forEach((v,i)=>
   ACH.push({id:"c"+v,en:"Click "+v+" times",fr:"Cliquer "+v+" fois",gem:1+i,test:()=>S.clicks>=v}));
-[5,15,30].forEach(v=>
-  ACH.push({id:"uc"+v,en:"Better Chip level "+v,fr:"Meilleure puce niv "+v,gem:2,test:()=>S.ups.click>=v}));
-[5,15].forEach(v=>
-  ACH.push({id:"ua"+v,en:"Auto Payments level "+v,fr:"Paiements auto niv "+v,gem:2,test:()=>S.ups.auto>=v}));
-ACH.push({id:"um5",en:"Gold Swipe level 5",fr:"Glissade dorée niv 5",gem:3,test:()=>S.ups.mult>=5});
-[5,15].forEach(v=>
-  ACH.push({id:"ut"+v,en:"Contactless level "+v,fr:"Sans contact niv "+v,gem:2,test:()=>S.ups.tap>=v}));
-ACH.push({id:"ul10",en:"Lucky Tap level 10",fr:"Clic chanceux niv 10",gem:3,test:()=>S.ups.lucky>=10});
-ACH.push({id:"un5",en:"Premium Network level 5",fr:"Réseau premium niv 5",gem:3,test:()=>S.ups.net>=5});
+ACH.push({id:"um5",en:"Gold Swipe",fr:"Glissade dorée",gem:3,test:()=>S.ups.mult>=1});
+ACH.push({id:"ul10",en:"Lucky Tap",fr:"Clic chanceux",gem:3,test:()=>S.ups.lucky>=1});
+ACH.push({id:"un5",en:"Premium Network",fr:"Réseau premium",gem:3,test:()=>S.ups.net>=1});
+ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
+ACH.push({id:"ua5",en:"Auto Payments",fr:"Paiements auto",gem:2,test:()=>S.ups.auto>=1});
+ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
 
 function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
 function checkAch(){
@@ -313,6 +331,7 @@ function applyLang(){
   document.getElementById("lSnd").textContent=t("snd");
   document.getElementById("lMus").textContent=t("mus");
   document.getElementById("lVol").textContent=t("vol");
+  document.getElementById("lSkin").textContent=t("skin");
   document.getElementById("lRes").textContent=t("res");
   const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
   so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
@@ -320,6 +339,7 @@ function applyLang(){
   document.getElementById("sndSel").value=S.snd;
   document.getElementById("musSel").value=S.mus;
   document.getElementById("volRange").value=S.vol;
+  renderSkinSel();
   renderAch();update();
 }
 
@@ -356,6 +376,9 @@ document.getElementById("musSel").onchange=e=>{
   updateMusicVol();save();
 };
 document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
+document.getElementById("skinSel").onchange=e=>{
+  S.skinChoice=+e.target.value;applySkin();save();
+};
 document.getElementById("resetBtn").onclick=()=>{
   if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");localStorage.removeItem("empireTycoonV2");location.reload()}
 };
