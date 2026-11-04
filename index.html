@@ -73,6 +73,7 @@ h3{margin:6px 0 12px}
 </header>
 <nav>
 <button class="active" data-p="game" id="nGame">Card</button>
+<button data-p="comp" id="nComp">Companies</button>
 <button data-p="ach" id="nAch"><span id="nAchT">Achievements</span><span class="badge" id="badge">0</span></button>
 <button data-p="set" id="nSet">Settings</button>
 </nav>
@@ -81,6 +82,11 @@ h3{margin:6px 0 12px}
 <div id="cardWrap"><div id="card"><div class="logo" id="cLogo">EMPIRE</div><div class="chip"></div><div class="num">•••• •••• •••• 2026</div><div class="name" id="cName">STANDARD</div></div></div>
 <h3 id="hUp">Upgrades</h3>
 <div id="ups"></div>
+</div>
+
+<div class="page" id="comp">
+<h3 id="hComp">Companies</h3>
+<div id="compList"></div>
 </div>
 
 <div class="page" id="ach">
@@ -106,7 +112,7 @@ h3{margin:6px 0 12px}
 
 <script>
 // ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skinChoice:0};
+const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skinChoice:0,companies:{}};
 let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
 for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
@@ -122,14 +128,14 @@ function save(){if(!resetting)localStorage.setItem("empireTycoon",JSON.stringify
 
 // ============ TEXTES ============
 const TX={
-en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset game",
+en:{card:"Card",comp:"Companies",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset game",
 confirm:"WARNING: This will permanently erase ALL your progress (money, upgrades, achievements, skins, gems and settings).\n\nClick OK to reset EVERYTHING. This cannot be undone.\n\nClick Cancel to keep your progress.",
-perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",
+perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",merge:"Merge",
 u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",
 u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
-fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser",
+fr:{card:"Carte",comp:"Entreprises",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser",
 confirm:"ATTENTION : Cela va effacer DÉFINITIVEMENT toute ta progression (argent, améliorations, succès, skins, gemmes et paramètres).\n\nClique sur OK pour TOUT réinitialiser. Cette action est irréversible.\n\nClique sur Annuler pour garder ta progression.",
-perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",
+perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",merge:"Fusion",
 u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",
 u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
 };
@@ -165,6 +171,61 @@ function renderSkinSel(){
   sel.value=opts.includes(S.skinChoice)?S.skinChoice:0;
 }
 
+// ============ ENTREPRISES : DONNÉES ============
+// cost : prix d'achat (0 = obtenue uniquement par fusion)
+// rev  : revenu passif par seconde
+// next : type obtenu en fusionnant 3 entreprises de ce type (null = dernier niveau)
+const COMPANIES=[
+{id:"shop",    en:"Corner Shop",       fr:"Petit magasin",      cost:500,          rev:2,        next:"megashop"},
+{id:"megashop",en:"Supermarket",       fr:"Supérette",          cost:0,            rev:12,       next:null},
+{id:"carwash", en:"Car Wash",          fr:"Lavage auto",        cost:2500,         rev:8,        next:"taxi"},
+{id:"taxi",    en:"Taxi Company",      fr:"Compagnie de taxi",  cost:0,            rev:40,       next:null},
+{id:"football",en:"Football Club",     fr:"Club de football",   cost:250000,       rev:600,      next:null},
+{id:"bank",    en:"Bank",              fr:"Banque",             cost:5000000,      rev:9000,     next:null},
+{id:"oil",     en:"Oil Station",       fr:"Station pétrolière", cost:500000000,    rev:900000,   next:null},
+{id:"space",   en:"Space Mining",      fr:"Mine spatiale",      cost:1000000000000,rev:20000000, next:null}
+];
+COMPANIES.forEach(c=>{if(S.companies[c.id]===undefined)S.companies[c.id]=0});
+
+// ============ ENTREPRISES : LOGIQUE ============
+function companyRev(){
+  return COMPANIES.reduce((sum,c)=>sum+c.rev*S.companies[c.id],0);
+}
+function buyCompany(id){
+  const c=COMPANIES.find(x=>x.id===id);
+  if(!c||c.cost===0||S.money<c.cost)return;
+  S.money-=c.cost;
+  S.companies[id]++;
+  tryMerge(c);
+  click();
+  save();update();renderCompanies();
+}
+// 3 entreprises d'un même type -> 1 du type supérieur (en boucle si besoin)
+function tryMerge(c){
+  if(!c.next)return;
+  while(S.companies[c.id]>=3){
+    S.companies[c.id]-=3;
+    S.companies[c.next]++;
+    const n=COMPANIES.find(x=>x.id===c.next);
+    if(n)tryMerge(n);
+  }
+}
+function renderCompanies(){
+  const el=document.getElementById("compList");
+  if(!el)return;
+  el.innerHTML=COMPANIES.map(c=>{
+    const name=S.lang==="fr"?c.fr:c.en;
+    const owned=S.companies[c.id];
+    const canBuy=c.cost>0&&S.money>=c.cost;
+    const btn=c.cost>0
+      ? '<button data-b="'+c.id+'" '+(canBuy?"":"disabled")+'>'+fmt(c.cost)+'</button>'
+      : '<button disabled>'+t("merge")+'</button>';
+    return '<div class="item"><div><div class="t">'+name+' <small>(x'+owned+')</small></div>'+
+      '<div class="d">+'+fmt(c.rev)+' '+t("persec")+'</div></div>'+btn+'</div>';
+  }).join("");
+  el.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>buyCompany(b.dataset.b));
+}
+
 // ============ UPGRADES ============
 const UPS={
 click:{base:15,g:1.35,key:"u_click"},
@@ -177,7 +238,7 @@ net:{base:3500,g:1.5,key:"u_net"}
 function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
 function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
 function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.25,S.ups.mult)}
-function perSecond(){return S.ups.auto+10*S.ups.net}
+function perSecond(){return S.ups.auto+10*S.ups.net+companyRev()}
 function luckyChance(){return Math.min(0.5,S.ups.lucky*0.02)}
 
 // ============ FORMAT ============
@@ -187,7 +248,6 @@ function fmt(n){
   while(n>=1000&&i<u.length-1){n/=1000;i++}
   return "$"+n.toFixed(2)+u[i];
 }
-
 // ============ SON ============
 let AC=null;
 function getAC(){
@@ -352,9 +412,11 @@ function update(){
 }
 function applyLang(){
   document.getElementById("nGame").textContent=t("card");
+  document.getElementById("nComp").textContent=t("comp");
   document.getElementById("nAchT").textContent=t("ach");
   document.getElementById("nSet").textContent=t("set");
   document.getElementById("hUp").textContent=t("up");
+  document.getElementById("hComp").textContent=t("comp");
   document.getElementById("hAch").textContent=t("ach");
   document.getElementById("hSet").textContent=t("set");
   document.getElementById("lLang").textContent=t("lang");
@@ -371,7 +433,7 @@ function applyLang(){
   document.getElementById("musSel").value=S.mus;
   document.getElementById("volRange").value=S.vol;
   renderSkinSel();
-  renderAch();update();
+  renderAch();renderCompanies();update();
 }
 
 function updateStickyHeader(page){
@@ -429,10 +491,12 @@ document.getElementById("skinSel").onchange=e=>{
   S.skinChoice=+e.target.value;applySkin();save();
 };
 document.getElementById("resetBtn").addEventListener("click",resetGame);
+
 // ============ LOOP ============
 setInterval(()=>{
   const ps=perSecond();
   if(ps>0){addMoney(ps);update()}
+  renderCompanies();
   checkAch();
 },1000);
 const saveTimer=setInterval(save,10000);
