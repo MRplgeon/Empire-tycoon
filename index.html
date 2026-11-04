@@ -41,7 +41,7 @@ nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 .claimAll{width:100%;margin-bottom:12px;background:#ffd24a;color:#111;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:15px;cursor:pointer}
 select,.btnr{background:#ffffff14;color:var(--text);border:1px solid #ffffff2a;border-radius:8px;padding:8px}
 select option{background:#2a2a33;color:#f1f1f1}
-.btnr{background:#a33;border:none;padding:10px 14px;font-weight:700}
+.btnr{background:#a33;border:none;padding:10px 14px;font-weight:700;color:#fff;cursor:pointer}
 input[type=range]{width:140px;accent-color:var(--accent)}
 h3{margin:6px 0 12px}
 </style>
@@ -82,7 +82,7 @@ h3{margin:6px 0 12px}
 <input type="range" id="volRange" min="0" max="100" step="1"></div>
 <div class="item"><span id="lSkin">Card skin</span>
 <select id="skinSel"></select></div>
-<div class="item"><span id="lRes">Reset game</span><button class="btnr" id="resetBtn">Reset</button></div>
+<div class="item"><span id="lRes">Reset game</span><button class="btnr" id="resetBtn" type="button">Reset</button></div>
 </div>
 
 <script>
@@ -100,10 +100,14 @@ function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 
 // ============ TEXTES ============
 const TX={
-en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",skinAch:"Card skin",
+en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset game",
+confirm:"WARNING: This will permanently erase ALL your progress (money, upgrades, achievements, skins, gems and settings).\n\nClick OK to reset EVERYTHING. This cannot be undone.\n\nClick Cancel to keep your progress.",
+perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",
 u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",
 u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
-fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",skinAch:"Skin de carte",
+fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser",
+confirm:"ATTENTION : Cela va effacer DÉFINITIVEMENT toute ta progression (argent, améliorations, succès, skins, gemmes et paramètres).\n\nClique sur OK pour TOUT réinitialiser. Cette action est irréversible.\n\nClique sur Annuler pour garder ta progression.",
+perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",
 u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",
 u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
 };
@@ -119,11 +123,9 @@ const SKINS=[
 {n:"DIAMOND",at:100000000000,c1:"#3aa0c8",c2:"#d8f6ff",a:"#7fe4ff",b1:"#06202c",b2:"#0e3a4c"},
 {n:"EMPIRE",at:10000000000000,c1:"#5a1a7a",c2:"#ff6ad5",a:"#ff9be8",b1:"#1a0626",b2:"#33104a"}
 ];
-// Un skin est "débloqué" (achievement prêt à réclamer) quand le solde actuel atteint le palier
-// "Réclamé" = skin utilisable dans les paramètres
-function skinClaimed(i){return !!S.claimed["skin"+i]}
+// STANDARD (index 0) est toujours disponible ; les autres doivent être réclamés
+function skinClaimed(i){return i===0||!!S.claimed["skin"+i]}
 function applySkin(){
-  // Le skin affiché = le choix du joueur s'il est réclamé, sinon STANDARD
   let idx=S.skinChoice;
   if(!skinClaimed(idx))idx=0;
   const s=SKINS[idx],r=document.documentElement.style;
@@ -248,7 +250,6 @@ document.addEventListener("visibilitychange",()=>{
 });
 
 // ============ ACHIEVEMENTS ============
-// Chaque test regarde le SOLDE ACTUEL (S.money) pour les paliers d'argent
 const ACH=[];
 [100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
   ACH.push({id:"m"+v,en:"Hold "+fmt(v),fr:"Avoir "+fmt(v)+" en compte",gem:1+i,test:()=>S.money>=v}));
@@ -260,10 +261,9 @@ ACH.push({id:"un5",en:"Premium Network",fr:"Réseau premium",gem:3,test:()=>S.up
 ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
 ACH.push({id:"ua5",en:"Auto Payments",fr:"Paiements auto",gem:2,test:()=>S.ups.auto>=1});
 ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
-// Skins : succès à réclamer, dès que le solde atteint le palier
 SKINS.forEach((s,i)=>{
   if(i===0)return;
-  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,skin:true,test:()=>S.money>=s.at});
+  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,test:()=>S.money>=s.at});
 });
 
 function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
@@ -300,6 +300,7 @@ function renderAch(){
 }
 
 // ============ UI ============
+function addMoney(n){S.money+=n;S.total+=n}
 function renderUps(){
   document.getElementById("ups").innerHTML=Object.keys(UPS).map(k=>{
     const mx=isMax(k);
@@ -329,6 +330,7 @@ function applyLang(){
   document.getElementById("lVol").textContent=t("vol");
   document.getElementById("lSkin").textContent=t("skin");
   document.getElementById("lRes").textContent=t("res");
+  document.getElementById("resetBtn").textContent=t("res");
   const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
   so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
   document.getElementById("langSel").value=S.lang;
@@ -343,6 +345,16 @@ function updateStickyHeader(page){
   document.body.classList.toggle("on-card",page==="game");
 }
 
+// ============ RESET ============
+function resetGame(){
+  if(!window.confirm(t("confirm")))return;
+  try{
+    localStorage.removeItem("empireTycoon");
+    localStorage.removeItem("empireTycoonV3");
+  }catch(e){}
+  setTimeout(()=>location.reload(),50);
+}
+
 // ============ EVENTS ============
 document.getElementById("card").addEventListener("pointerdown",e=>{
   let g=perClick(),lucky=false;
@@ -353,7 +365,6 @@ document.getElementById("card").addEventListener("pointerdown",e=>{
   document.body.appendChild(f);setTimeout(()=>f.remove(),900);
   update();checkAch();
 });
-function addMoney(n){S.money+=n;S.total+=n}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -375,9 +386,7 @@ document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusi
 document.getElementById("skinSel").onchange=e=>{
   S.skinChoice=+e.target.value;applySkin();save();
 };
-document.getElementById("resetBtn").onclick=()=>{
-  if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");localStorage.removeItem("empireTycoonV3");location.reload()}
-};
+document.getElementById("resetBtn").addEventListener("click",resetGame);
 
 // ============ LOOP ============
 setInterval(()=>{const ps=perSecond();if(ps>0){addMoney(ps);update()}checkAch()},1000);
