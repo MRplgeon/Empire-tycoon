@@ -709,6 +709,272 @@ document.getElementById("claimAll").onclick=()=>{
   ACH.forEach(a=>claim(a.id));
   renderAch();renderSkinSel();applySkin();update();
 };
+<script>
+// ============ PROFIL ============
+function renderProfile(){
+  const total=S.total||1;
+  const cardPct=S.stats.byCard/total*100;
+  const compPct=S.stats.byComp/total*100;
+  const rePct=S.stats.byRe/total*100;
+  const vehPct=S.stats.byVeh/total*100;
+  const otherVal=Math.max(0,S.total-S.stats.byCard-S.stats.byComp-S.stats.byRe-S.stats.byVeh);
+  const otherPct=otherVal/total*100;
+  const row=(label,val,pct)=>'<div class="stat"><span>'+label+'</span><span>'+fmt(val)+' <small style="opacity:.6">('+pct.toFixed(1)+'%)</small></span></div>'+
+    '<div class="bar"><div style="width:'+Math.min(100,pct).toFixed(1)+'%"></div></div>';
+  let h='';
+  h+='<div class="item"><div><div class="t">'+t("pTotal")+'</div><div class="d" style="font-size:22px;color:var(--accent)">'+fmt(S.total)+'</div></div></div>';
+  h+='<div class="sec">'+t("pShare")+'</div>';
+  h+=row(t("pCard"),S.stats.byCard,cardPct);
+  h+=row(t("pComp"),S.stats.byComp,compPct);
+  h+=row(t("pRe"),S.stats.byRe,rePct);
+  h+=row(t("pVeh"),S.stats.byVeh,vehPct);
+  h+=row(t("pOther"),otherVal,otherPct);
+  h+='<div class="sec">'+t("pBought")+'</div>';
+  h+='<div class="stat"><span>'+t("pBought")+'</span><span>'+S.stats.bought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pCompB")+'</span><span>'+S.stats.compBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pReB")+'</span><span>'+S.stats.reBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pVehB")+'</span><span>'+S.stats.vehBought+'</span></div>';
+  h+='<div class="stat"><span>'+t("pClicks")+'</span><span>'+S.clicks+'</span></div>';
+  h+='<div class="stat"><span>'+t("pAch")+'</span><span>'+Object.keys(S.ach).length+'/'+ACH.length+'</span></div>';
+  document.getElementById("profList").innerHTML=h;
+}
+// Comptabilise les revenus par source (appelée à chaque gain passif)
+function addIncome(src,n){
+  if(n<=0)return;
+  S.total+=n;
+  S.stats[src]=(S.stats[src]||0)+n;
+}
+
+// ============ SKINS ============
+function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
+function renderSkinSel(){
+  const sel=document.getElementById("skinSel");
+  const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
+  sel.innerHTML=avail.map(o=>'<option value="'+o.i+'">'+o.s.n+'</option>').join("");
+  sel.value=S.skinChoice;
+}
+function applySkin(){
+  const s=currentSkin(),c=document.getElementById("card");
+  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
+  document.getElementById("pattern").style.background=s.pat;
+  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
+  document.getElementById("money").style.color=s.acc;
+}
+
+// ============ SON ============
+let AC=null;
+function getAC(){
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==="suspended"&&!document.hidden)AC.resume();
+  return AC;
+}
+function click(){
+  if(!S.snd)return;
+  try{
+    const a=getAC();
+    const o=a.createOscillator(),g=a.createGain();
+    o.frequency.value=520+Math.random()*60;o.type="triangle";
+    g.gain.setValueAtTime(.06,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
+    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
+  }catch(e){}
+}
+const CHORDS=[[261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]];
+const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
+let chordIdx=0,melIdx=0,musicStarted=false,musicGain=null,musicTimer=null;
+function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
+function playNote(freq,start,dur,type,peak){
+  const a=AC,o=a.createOscillator(),g=a.createGain();
+  o.type=type;o.frequency.value=freq;
+  g.gain.setValueAtTime(0,start);
+  g.gain.linearRampToValueAtTime(peak,start+Math.min(0.4,dur*0.3));
+  g.gain.linearRampToValueAtTime(0,start+dur);
+  o.connect(g);g.connect(musicGain);
+  o.start(start);o.stop(start+dur+0.05);
+}
+function playChord(){
+  if(!S.mus||!AC||document.hidden||!musicGain)return;
+  try{
+    const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
+    ch.forEach(f=>playNote(f,now,3.8,"triangle",0.18));
+    for(let i=0;i<2;i++){
+      const f=MELODY[melIdx%MELODY.length];melIdx++;
+      playNote(f,now+0.3+i*1.8,1.2,"sine",0.14);
+    }
+  }catch(e){}
+}
+function startMusic(){
+  if(musicStarted)return;
+  try{
+    const a=getAC();
+    musicGain=a.createGain();
+    musicGain.gain.value=musicVol();
+    musicGain.connect(a.destination);
+    musicStarted=true;
+    playChord();
+    musicTimer=setInterval(playChord,4000);
+  }catch(e){}
+}
+function updateMusicVol(){
+  if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
+}
+["pointerdown","touchstart","keydown"].forEach(ev=>
+  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
+document.addEventListener("visibilitychange",()=>{
+  if(!AC)return;
+  if(document.hidden){
+    if(musicGain){musicGain.gain.cancelScheduledValues(AC.currentTime);musicGain.gain.setValueAtTime(0,AC.currentTime)}
+    AC.suspend();
+  }else{
+    if(AC.state==="suspended")AC.resume();
+    if(musicGain){
+      const target=musicVol();
+      musicGain.gain.cancelScheduledValues(AC.currentTime);
+      musicGain.gain.setValueAtTime(0,AC.currentTime);
+      musicGain.gain.linearRampToValueAtTime(target,AC.currentTime+1.5);
+    }
+  }
+});
+</script>
+<script>
+// ============ SUCCÈS ============
+const ACH=[];
+[100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
+  ACH.push({id:"m"+v,en:"Hold "+fmt(v),fr:"Avoir "+fmt(v)+" en compte",gem:1+i,test:()=>S.money>=v}));
+[10,100,500,1000,5000].forEach((v,i)=>
+  ACH.push({id:"c"+v,en:"Click "+v+" times",fr:"Cliquer "+v+" fois",gem:1+i,test:()=>S.clicks>=v}));
+ACH.push({id:"um5",en:"Gold Swipe",fr:"Glissade dorée",gem:3,test:()=>S.ups.mult>=1});
+ACH.push({id:"ul10",en:"Lucky Tap",fr:"Clic chanceux",gem:3,test:()=>S.ups.lucky>=1});
+ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
+ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
+COMPANIES.forEach((c,i)=>{
+  ACH.push({id:"co"+c.id,en:"Own a "+c.en,fr:"Posséder : "+nm(c),gem:2+Math.min(i,4),test:()=>compCount(c.id)>=1});
+});
+RE.forEach((re,i)=>{
+  ACH.push({id:"re"+re.id,en:"Own "+re.en,fr:"Posséder : "+nm(re),gem:2+Math.min(i,5),test:()=>reOwned(re.id)>=1});
+});
+SKINS.forEach((s,i)=>{
+  if(i===0)return;
+  ACH.push({id:"skin"+i,en:"Card skin: "+s.n+" ("+fmt(s.at)+" in account)",fr:"Skin de carte : "+s.n+" ("+fmt(s.at)+" en compte)",gem:2+i,test:()=>S.money>=s.at});
+});
+function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
+function checkAch(){
+  let ch=false;
+  ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;ch=true}});
+  if(ch)renderAch();
+  updateBadge();
+}
+function updateBadge(){
+  const n=readyCount(),b=document.getElementById("badge");
+  b.style.display=n>0?"block":"none";b.textContent=n;
+}
+function claim(id){
+  const a=ACH.find(x=>x.id===id);
+  if(a&&S.ach[id]&&!S.claimed[id]){
+    S.claimed[id]=1;S.gems+=a.gem;
+    if(id.startsWith("skin"))S.skinChoice=parseInt(id.slice(4),10);
+    click();save();
+  }
+}
+function renderAch(){
+  const n=readyCount(),ca=document.getElementById("claimAll");
+  ca.style.display=n>0?"block":"none";
+  ca.textContent=t("claimall")+" ("+n+")";
+  const order=a=>S.ach[a.id]&&!S.claimed[a.id]?0:(!S.ach[a.id]?1:2);
+  const list=ACH.map((a,i)=>({a,i})).sort((x,y)=>order(x.a)-order(y.a)||x.i-y.i).map(o=>o.a);
+  document.getElementById("achList").innerHTML=list.map(a=>{
+    const name=S.lang==="fr"?a.fr:a.en;
+    const ready=S.ach[a.id]&&!S.claimed[a.id],done=S.claimed[a.id];
+    return '<div class="item ach '+(done?"done":"")+(ready?" ready":"")+'"><div><div class="t">'+name+'</div></div><div>'+
+      (ready?'<button data-c="'+a.id+'">'+t("claim")+' +'+a.gem+' 💎</button>':(done?"✔ ":"")+'+'+a.gem+' 💎')+'</div></div>';
+  }).join("");
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{
+    claim(b.dataset.c);renderAch();renderSkinSel();applySkin();update();
+  });
+  updateBadge();
+}
+
+// ============ UI ============
+function addMoney(n){S.money+=n}
+function renderUps(){
+  document.getElementById("upsList").innerHTML=Object.keys(UPS).map(k=>{
+    const mx=isMax(k);
+    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
+  }).join("");
+  document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.u,c=cost(k);
+    if(!isMax(k)&&S.money>=c){S.money-=c;S.ups[k]++;click();update();checkAch();save()}
+  });
+}
+function update(){
+  document.getElementById("money").textContent=fmt(S.money);
+  document.getElementById("info").textContent=fmt(perClick())+" "+t("perclick")+" • "+fmt(perSecond())+" "+t("persec");
+  document.getElementById("gems").textContent="💎 "+S.gems;
+  applySkin();renderUps();
+}
+function applyLang(){
+  document.getElementById("nGame").textContent=t("card");
+  document.getElementById("nComp").textContent=t("comp");
+  document.getElementById("nGoods").textContent=t("goods");
+  document.getElementById("hAch").textContent=t("ach");
+  document.getElementById("nProf").textContent=t("prof");
+  document.getElementById("nSet").textContent=t("set");
+  document.getElementById("hUp").textContent=t("up");
+  document.getElementById("lLang").textContent=t("lang");
+  document.getElementById("lSnd").textContent=t("snd");
+  document.getElementById("lMus").textContent=t("mus");
+  document.getElementById("lVol").textContent=t("vol");
+  document.getElementById("lSkin").textContent=t("skin");
+  document.getElementById("resetBtn").textContent=t("res");
+  const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
+  so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
+  document.getElementById("langSel").value=S.lang;
+  document.getElementById("sndSel").value=S.snd;
+  document.getElementById("musSel").value=S.mus;
+  document.getElementById("volRange").value=S.vol;
+  renderSkinSel();renderAch();update();renderCompanies();renderGoods();renderProfile();
+}
+function updateStickyHeader(page){document.body.classList.toggle("on-card",page==="game")}
+</script>
+<script>
+// ============ RESET ============
+let saveTimer=null;
+function resetGame(){
+  if(!window.confirm(t("confirm")))return;
+  clearInterval(saveTimer);
+  Object.keys(localStorage).filter(k=>k.startsWith("empireTycoon")).forEach(k=>localStorage.removeItem(k));
+  location.reload();
+}
+
+// ============ EVENTS ============
+document.getElementById("card").addEventListener("pointerdown",e=>{
+  let g=perClick(),lucky=false;
+  if(Math.random()<luckyChance()){g*=5;lucky=true}
+  S.clicks++;click();
+  addIncome("byCard",g);
+  const f=document.createElement("div");
+  f.className="float"+(lucky?" lucky":"");
+  f.textContent="+"+fmt(g)+(lucky?" ★":"");
+  f.style.left=(e.clientX-20)+"px";
+  f.style.top=(e.clientY-30)+"px";
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),900);
+  update();checkAch();
+});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById(b.dataset.p).classList.add("active");
+  if(b.dataset.p==="comp"){openComp=null;renderCompanies()}
+  if(b.dataset.p==="goods"){goodsView="root";renderGoods()}
+  if(b.dataset.p==="profile")renderProfile();
+  updateStickyHeader(b.dataset.p);
+});
+document.getElementById("claimAll").onclick=()=>{
+  ACH.forEach(a=>claim(a.id));
+  renderAch();renderSkinSel();applySkin();update();
+};
 document.getElementById("langSel").onchange=e=>{S.lang=e.target.value;applyLang();save()};
 document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;updateMusicVol();save()};
 document.getElementById("musSel").onchange=e=>{
