@@ -7,9 +7,10 @@
 <style>
 :root{--bg1:#1a1a1f;--bg2:#2a2a33;--accent:#9aa0a6;--text:#f1f1f1;--card1:#3a3a42;--card2:#6b6b75}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{margin:0;font-family:system-ui,Arial,sans-serif;color:var(--text);background:linear-gradient(160deg,var(--bg1),var(--bg2));min-height:100vh;transition:background 1.5s}
-header{padding:14px;text-align:center;border-bottom:1px solid #ffffff22}
-#money{font-size:32px;font-weight:700;color:var(--accent);transition:color 1s}
+body{margin:0;font-family:system-ui,Arial,sans-serif;color:var(--text);background:linear-gradient(160deg,var(--bg1),var(--bg2));min-height:100vh}
+header{padding:14px;text-align:center;border-bottom:1px solid #ffffff22;background:var(--bg1);z-index:50}
+body.on-card header{position:sticky;top:0}
+#money{font-size:32px;font-weight:700;color:var(--accent)}
 #info{font-size:13px;opacity:.7;margin-top:4px}
 nav{display:flex;border-bottom:1px solid #ffffff22}
 nav button{flex:1;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative}
@@ -26,153 +27,189 @@ nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 #card .name{position:absolute;left:22px;bottom:22px;font-size:12px;opacity:.7;letter-spacing:2px}
 #card .logo{position:absolute;right:22px;top:20px;font-weight:700;letter-spacing:2px;opacity:.9}
 .float{position:fixed;pointer-events:none;font-weight:700;color:#7dff9a;font-size:20px;animation:up .9s forwards;z-index:99}
-.float.lucky{color:#ffd24a;font-size:26px}
+.float.lucky{color:#ffd54a;font-size:26px}
 @keyframes up{to{transform:translateY(-70px);opacity:0}}
-.item{background:#ffffff0d;border:1px solid #ffffff1a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.item .t{font-weight:600}
-.item .d{font-size:12px;opacity:.65;margin-top:2px}
-.item button{background:var(--accent);color:#111;border:none;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer;white-space:nowrap}
-.item button:disabled{opacity:.35}
-.ach.done{border-color:#7dff9a88}
-.ach.done .t{color:#7dff9a}
-.ach.ready{border-color:#ffd24a;box-shadow:0 0 12px #ffd24a44}
-.ach.ready .t{color:#ffd24a}
-.claimAll{width:100%;margin-bottom:12px;background:#ffd24a;color:#111;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:15px;cursor:pointer}
-select,.btnr{background:#ffffff14;color:var(--text);border:1px solid #ffffff2a;border-radius:8px;padding:8px}
-.btnr{background:#a33;border:none;padding:10px 14px;font-weight:700}
-input[type=range]{width:140px;accent-color:var(--accent)}
-h3{margin:6px 0 12px}
+.upg{display:flex;justify-content:space-between;align-items:center;padding:12px;margin:8px 0;border-radius:12px;background:#ffffff0d}
+.upg button,.btn{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#111;font-weight:700;cursor:pointer}
+.upg button:disabled{opacity:.35}
+.ach{padding:12px;margin:8px 0;border-radius:12px;background:#ffffff0d;display:flex;justify-content:space-between;align-items:center}
+.ach.done{border-left:3px solid #7dff9a}
+.set{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #ffffff15}
+select,input[type=range]{background:#222;color:#fff;border:1px solid #444;border-radius:6px;padding:4px}
+#resetBtn{background:#a33;color:#fff}
 </style>
 </head>
 <body>
+
 <header>
-<div id="money">$0</div>
-<div id="info"></div>
-<div id="gems" style="font-size:13px;margin-top:4px">💎 0</div>
+  <div id="money">$0</div>
+  <div id="info"></div>
 </header>
+
 <nav>
-<button class="active" data-p="game" id="nGame">Card</button>
-<button data-p="ach" id="nAch"><span id="nAchT">Achievements</span><span class="badge" id="badge">0</span></button>
-<button data-p="set" id="nSet">Settings</button>
+  <button class="active" data-p="game"><span id="lCard">Card</span></button>
+  <button data-p="ach"><span id="lAch">Achievements</span><span class="badge" id="achBadge"></span></button>
+  <button data-p="set"><span id="lSet">Settings</span></button>
 </nav>
 
-<div class="page active" id="game">
-<div id="cardWrap"><div id="card"><div class="logo" id="cLogo">EMPIRE</div><div class="chip"></div><div class="num">•••• •••• •••• 2026</div><div class="name" id="cName">STANDARD</div></div></div>
-<h3 id="hUp">Upgrades</h3>
-<div id="ups"></div>
+<div id="game" class="page active">
+  <div id="cardWrap"><div id="card">
+    <div class="logo">EMPIRE</div>
+    <div class="chip"></div>
+    <div class="num">4000 •••• •••• 1234</div>
+    <div class="name">TYCOON</div>
+  </div></div>
+  <div id="upgrades"></div>
 </div>
 
-<div class="page" id="ach">
-<h3 id="hAch">Achievements</h3>
-<button class="claimAll" id="claimAll" style="display:none"></button>
-<div id="achList"></div>
+<div id="ach" class="page">
+  <button class="btn" id="claimAll">Claim all</button>
+  <div id="achList"></div>
 </div>
 
-<div class="page" id="set">
-<h3 id="hSet">Settings</h3>
-<div class="item"><span id="lLang">Language</span>
-<select id="langSel"><option value="en">English</option><option value="fr">Français</option></select></div>
-<div class="item"><span id="lSnd">Sound</span>
-<select id="sndSel"><option value="1">On</option><option value="0">Off</option></select></div>
-<div class="item"><span id="lMus">Music</span>
-<select id="musSel"><option value="1">On</option><option value="0">Off</option></select></div>
-<div class="item"><span id="lVol">Music volume</span>
-<input type="range" id="volRange" min="0" max="100" step="1"></div>
-<div class="item"><span id="lRes">Reset game</span><button class="btnr" id="resetBtn">Reset</button></div>
+<div id="set" class="page">
+  <div class="set"><span id="lLang">Language</span>
+    <select id="langSel"><option value="en">English</option><option value="fr">Français</option></select></div>
+  <div class="set"><span id="lSnd">Click sound</span>
+    <select id="sndSel"><option value="1">On</option><option value="0">Off</option></select></div>
+  <div class="set"><span id="lMus">Music</span>
+    <select id="musSel"><option value="1">On</option><option value="0">Off</option></select></div>
+  <div class="set"><span id="lVol">Music volume</span>
+    <input type="range" id="volRange" min="0" max="100"></div>
+  <div class="set"><span id="lRes">Reset</span>
+    <button class="btn" id="resetBtn">Reset</button></div>
 </div>
+
 <script>
-// ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skin:0};
-let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
+// ============ DATA ============
+const DEF={money:0,total:0,clicks:0,lang:"en",snd:1,mus:1,vol:50,
+  ups:{},ach:{},claimed:{},gems:0};
+const S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
 for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
-// Migration : anciens succès déjà payés -> marqués comme réclamés
-if(!localStorage.getItem("empireTycoonV2")){
-  for(const id in S.ach){S.claimed[id]=1}
-  localStorage.setItem("empireTycoonV2","1");
-}
+
 function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 
-// ============ TEXTES ============
-const TX={
-en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound",mus:"Music",vol:"Music volume",res:"Reset game",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",
-u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",
-u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
-fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",
-u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",
-u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
+// ============ LANG ============
+const LANG={
+  en:{card:"Card",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Click sound",mus:"Music",vol:"Music volume",res:"Reset",confirm:"Erase all progress?",perclick:"per click",persec:"per sec",buy:"Buy",lvl:"Lvl",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX"},
+  fr:{card:"Carte",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Son",mus:"Musique",vol:"Volume musique",res:"Réinitialiser",confirm:"Effacer toute la progression ?",perclick:"par clic",persec:"par sec",buy:"Acheter",lvl:"Niv",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX"}
 };
-function t(k){return (TX[S.lang]&&TX[S.lang][k])||TX.en[k]||k}
+function t(k){return LANG[S.lang][k]||k}
 
-// ============ SKINS ============
-const SKINS=[
-{n:"STANDARD",at:0,c1:"#3a3a42",c2:"#6b6b75",a:"#9aa0a6",b1:"#1a1a1f",b2:"#2a2a33"},
-{n:"STEEL",at:25000,c1:"#4a5560",c2:"#9fb0c0",a:"#b8c7d6",b1:"#1a2028",b2:"#28323c"},
-{n:"GOLD",at:100000,c1:"#8a6a1a",c2:"#f0cf6a",a:"#f0cf6a",b1:"#22190a",b2:"#3a2c10"},
-{n:"PLATINUM",at:10000000,c1:"#7c8aa0",c2:"#e8eef8",a:"#e8eef8",b1:"#151a24",b2:"#262f40"},
-{n:"BLACK",at:1000000000,c1:"#050505",c2:"#2b2b2b",a:"#d4af37",b1:"#000",b2:"#111"},
-{n:"DIAMOND",at:100000000000,c1:"#3aa0c8",c2:"#d8f6ff",a:"#7fe4ff",b1:"#06202c",b2:"#0e3a4c"},
-{n:"EMPIRE",at:10000000000000,c1:"#5a1a7a",c2:"#ff6ad5",a:"#ff9be8",b1:"#1a0626",b2:"#33104a"}
+function applyLang(){
+  document.getElementById("lCard").textContent=t("card");
+  document.getElementById("lAch").textContent=t("ach");
+  document.getElementById("lSet").textContent=t("set");
+  document.getElementById("lLang").textContent=t("lang");
+  document.getElementById("lSnd").textContent=t("snd");
+  document.getElementById("lMus").textContent=t("mus");
+  document.getElementById("lVol").textContent=t("vol");
+  document.getElementById("lRes").textContent=t("res");
+  document.getElementById("claimAll").textContent=t("claimall");
+  const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
+  so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
+  document.getElementById("langSel").value=S.lang;
+  document.getElementById("sndSel").value=S.snd;
+  document.getElementById("musSel").value=S.mus;
+  document.getElementById("volRange").value=S.vol;
+  renderAch();update();
+}
+
+// ============ UPGRADES CARTE ============
+const UPS=[
+  {id:"u_tap",name:{en:"Contactless",fr:"Sans contact"},desc:{en:"+$5 per click",fr:"+5$ par clic"},base:50,cost:1.6,
+    effect:l=>({click:5*l})},
+  {id:"u_lucky",name:{en:"Lucky Tap",fr:"Tap chanceux"},desc:{en:"+2% chance of x5 click",fr:"+2% de chance de clic x5"},base:500,cost:1.8,
+    effect:l=>({lucky:0.02*l})},
+  {id:"u_net",name:{en:"Premium Network",fr:"Réseau premium"},desc:{en:"+$10 per second",fr:"+10$ par seconde"},base:2000,cost:2,
+    effect:l=>({sec:10*l})}
 ];
-function applySkin(){
-  let idx=0;SKINS.forEach((s,i)=>{if(S.total>=s.at)idx=i});
-  S.skin=idx;const s=SKINS[idx],r=document.documentElement.style;
-  r.setProperty("--card1",s.c1);r.setProperty("--card2",s.c2);r.setProperty("--accent",s.a);
-  r.setProperty("--bg1",s.b1);r.setProperty("--bg2",s.b2);
-  document.getElementById("cName").textContent=s.n;
+
+function upCost(u){return Math.floor(u.base*Math.pow(u.cost,S.ups[u.id]))}
+function perClick(){let v=1;UPS.forEach(u=>{if(u.effect(S.ups[u.id]).click)v+=u.effect(S.ups[u.id]).click});return v}
+function perSecond(){let v=0;UPS.forEach(u=>{const e=u.effect(S.ups[u.id]);if(e.sec)v+=e.sec});return v}
+function luckyChance(){let v=0;UPS.forEach(u=>{const e=u.effect(S.ups[u.id]);if(e.lucky)v+=e.lucky});return v}
+
+function buyUp(id){
+  const u=UPS.find(x=>x.id===id);
+  const c=upCost(u);
+  if(S.money>=c){S.money-=c;S.ups[id]++;update();save()}
 }
 
-// ============ UPGRADES ============
-const UPS={
-click:{base:15,g:1.35,key:"u_click"},
-auto:{base:60,g:1.4,key:"u_auto"},
-tap:{base:400,g:1.45,key:"u_tap"},
-mult:{base:900,g:2.1,key:"u_mult"},
-lucky:{base:2500,g:1.6,key:"u_lucky",max:25},
-net:{base:3500,g:1.5,key:"u_net"}
-};
-function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
-function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
-function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.25,S.ups.mult)}
-function perSecond(){return S.ups.auto+10*S.ups.net}
-function luckyChance(){return Math.min(0.5,S.ups.lucky*0.02)}
-
-// ============ FORMAT ============
-function fmt(n){
-  if(n<1000)return "$"+(n%1===0?n:n.toFixed(1));
-  const u=["K","M","B","T","Qa"];let i=-1;
-  while(n>=1000&&i<u.length-1){n/=1000;i++}
-  return "$"+n.toFixed(2)+u[i];
+// ============ ACHIEVEMENTS ============
+const ACH=[
+  {id:"a100",at:100,gems:1,name:{en:"First $100",fr:"Premier 100$"}},
+  {id:"a1k",at:1000,gems:2,name:{en:"$1,000 saved",fr:"1 000$ économisés"}},
+  {id:"a10k",at:10000,gems:4,name:{en:"$10,000 saved",fr:"10 000$ économisés"}},
+  {id:"a100k",at:100000,gems:8,name:{en:"$100,000 saved",fr:"100 000$ économisés"}}
+];
+function checkAch(){
+  ACH.forEach(a=>{if(S.total>=a.at)S.ach[a.id]=1});
+  const n=Object.keys(S.ach).filter(k=>!S.claimed[k]).length;
+  const b=document.getElementById("achBadge");
+  b.style.display=n?"inline-block":"none";b.textContent=n;
+}
+function claim(id){
+  if(S.ach[id]&&!S.claimed[id]){S.claimed[id]=1;S.gems+=ACH.find(a=>a.id===id).gems;save()}
+}
+function renderAch(){
+  const list=document.getElementById("achList");list.innerHTML="";
+  ACH.forEach(a=>{
+    const done=S.ach[a.id],cl=S.claimed[a.id];
+    const d=document.createElement("div");d.className="ach"+(done?" done":"");
+    d.innerHTML=`<span>${a.name[S.lang]} (+${a.gems}💎)</span>`;
+    const b=document.createElement("button");b.className="btn";
+    b.textContent=cl?"✓":t("claim");b.disabled=!done||cl;
+    b.onclick=()=>{claim(a.id);renderAch();update();checkAch()};
+    d.appendChild(b);list.appendChild(d);
+  });
+  checkAch();
 }
 
-// ============ SON ============
-let AC=null;
+// ============ UI ============
+function fmt(n){return "$"+Math.floor(n).toLocaleString("en-US")}
+function update(){
+  document.getElementById("money").textContent=fmt(S.money);
+  document.getElementById("info").textContent=`${fmt(perClick())} ${t("perclick")} · ${fmt(perSecond())} ${t("persec")} · 💎 ${S.gems}`;
+  renderUps();
+}
+function renderUps(){
+  const box=document.getElementById("upgrades");box.innerHTML="";
+  UPS.forEach(u=>{
+    const c=upCost(u),d=document.createElement("div");d.className="upg";
+    d.innerHTML=`<div><b>${u.name[S.lang]}</b> (${t("lvl")} ${S.ups[u.id]})<br><small>${u.desc[S.lang]}</small></div>`;
+    const b=document.createElement("button");b.textContent=`${t("buy")} ${fmt(c)}`;
+    b.disabled=S.money<c;b.onclick=()=>buyUp(u.id);
+    d.appendChild(b);box.appendChild(d);
+  });
+}
+
+// ============ AUDIO ============
+let AC=null,musicGain=null,musicTimer=null,musicStarted=false,chordIdx=0,melIdx=0;
+const CHORDS=[
+  [261.63,329.63,392.00],[349.23,440.00,523.25],[293.66,369.99,440.00],[392.00,493.88,587.33]
+];
+const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
+
 function getAC(){
-  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-  if(AC.state==="suspended")AC.resume();
+  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
   return AC;
 }
+function musicVol(){return S.mus&&S.snd!==0?(S.vol/100)*0.12:0}
+
 function click(){
   if(!S.snd)return;
   try{
-    const a=getAC();
-    const o=a.createOscillator(),g=a.createGain();
-    o.frequency.value=520+Math.random()*60;o.type="triangle";
-    g.gain.setValueAtTime(.06,a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
-    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08);
+    const a=getAC(),o=a.createOscillator(),g=a.createGain();
+    o.type="sine";o.frequency.value=1200;
+    g.gain.setValueAtTime(0.08,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.08);
+    o.connect(g);g.connect(a.destination);
+    o.start();o.stop(a.currentTime+0.09);
   }catch(e){}
 }
-// Musique d'ambiance plus lumineuse, générée (accords majeurs + petite mélodie)
-const CHORDS=[
-  [261.63,329.63,392.00],  // Do majeur
-  [349.23,440.00,523.25],  // Fa majeur
-  [293.66,369.99,440.00],  // Ré majeur
-  [392.00,493.88,587.33]   // Sol majeur
-];
-const MELODY=[523.25,587.33,659.25,783.99,659.25,587.33,523.25,659.25,783.99,880.00,783.99,659.25];
-let chordIdx=0,melIdx=0;
-function musicVol(){return S.mus?(S.vol/100)*0.12:0}
+
 function playNote(freq,start,dur,type,peak){
   const a=AC;
   const o=a.createOscillator(),g=a.createGain();
@@ -183,20 +220,20 @@ function playNote(freq,start,dur,type,peak){
   o.connect(g);g.connect(musicGain);
   o.start(start);o.stop(start+dur+0.05);
 }
+
 function playChord(){
-  if(!S.mus||!AC)return;
+  // Ne joue rien si la musique est coupée ou si l'onglet est caché
+  if(!S.mus||!AC||document.hidden||!musicGain)return;
   try{
     const now=AC.currentTime,ch=CHORDS[chordIdx%CHORDS.length];chordIdx++;
-    // Accord doux et chaleureux
     ch.forEach(f=>playNote(f,now,3.8,"triangle",0.18));
-    // Petite mélodie légère par-dessus (2 notes sur 4 secondes)
     for(let i=0;i<2;i++){
       const f=MELODY[melIdx%MELODY.length];melIdx++;
       playNote(f,now+0.3+i*1.8,1.2,"sine",0.14);
     }
   }catch(e){}
 }
-let musicStarted=false,musicGain=null,musicTimer=null;
+
 function startMusic(){
   if(musicStarted)return;
   try{
@@ -209,98 +246,33 @@ function startMusic(){
     musicTimer=setInterval(playChord,4000);
   }catch(e){}
 }
+
 function updateMusicVol(){
   if(musicGain&&AC)musicGain.gain.setTargetAtTime(musicVol(),AC.currentTime,0.1);
 }
-// Démarre au premier toucher (exigé par les navigateurs)
+
 ["pointerdown","touchstart","keydown"].forEach(ev=>
-  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{once:false,passive:true}));
+  document.addEventListener(ev,()=>{if(S.mus)startMusic();else getAC()},{passive:true}));
 
-// ============ ACHIEVEMENTS ============
-const ACH=[];
-[100,1000,10000,25000,100000,1000000,10000000,1000000000].forEach((v,i)=>
-  ACH.push({id:"m"+v,en:"Earn "+fmt(v),fr:"Gagner "+fmt(v),gem:1+i,test:()=>S.total>=v}));
-[10,100,500,1000,5000].forEach((v,i)=>
-  ACH.push({id:"c"+v,en:"Click "+v+" times",fr:"Cliquer "+v+" fois",gem:1+i,test:()=>S.clicks>=v}));
-[5,15,30].forEach(v=>
-  ACH.push({id:"uc"+v,en:"Better Chip level "+v,fr:"Meilleure puce niv "+v,gem:2,test:()=>S.ups.click>=v}));
-[5,15].forEach(v=>
-  ACH.push({id:"ua"+v,en:"Auto Payments level "+v,fr:"Paiements auto niv "+v,gem:2,test:()=>S.ups.auto>=v}));
-ACH.push({id:"um5",en:"Gold Swipe level 5",fr:"Glissade dorée niv 5",gem:3,test:()=>S.ups.mult>=5});
-[5,15].forEach(v=>
-  ACH.push({id:"ut"+v,en:"Contactless level "+v,fr:"Sans contact niv "+v,gem:2,test:()=>S.ups.tap>=v}));
-ACH.push({id:"ul10",en:"Lucky Tap level 10",fr:"Clic chanceux niv 10",gem:3,test:()=>S.ups.lucky>=10});
-ACH.push({id:"un5",en:"Premium Network level 5",fr:"Réseau premium niv 5",gem:3,test:()=>S.ups.net>=5});
+// Pause propre : coupe le volume sans pic, remonte en douceur au retour
+document.addEventListener("visibilitychange",()=>{
+  if(!AC||!musicGain)return;
+  const now=AC.currentTime;
+  if(document.hidden){
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setValueAtTime(0,now);
+  }else{
+    if(AC.state==="suspended")AC.resume();
+    const target=musicVol();
+    musicGain.gain.cancelScheduledValues(AC.currentTime);
+    musicGain.gain.setValueAtTime(0,AC.currentTime);
+    musicGain.gain.linearRampToValueAtTime(target,AC.currentTime+1.5);
+  }
+});
 
-function readyCount(){return ACH.filter(a=>S.ach[a.id]&&!S.claimed[a.id]).length}
-function checkAch(){
-  let ch=false;
-  ACH.forEach(a=>{if(!S.ach[a.id]&&a.test()){S.ach[a.id]=1;ch=true}});
-  if(ch){renderAch()}
-  updateBadge();
-}
-function updateBadge(){
-  const n=readyCount(),b=document.getElementById("badge");
-  b.style.display=n>0?"block":"none";b.textContent=n;
-}
-function claim(id){
-  const a=ACH.find(x=>x.id===id);
-  if(a&&S.ach[id]&&!S.claimed[id]){S.claimed[id]=1;S.gems+=a.gem;click();save()}
-}
-function renderAch(){
-  const n=readyCount(),ca=document.getElementById("claimAll");
-  ca.style.display=n>0?"block":"none";
-  ca.textContent=t("claimall")+" ("+n+")";
-  // prêts d'abord, puis non débloqués, puis réclamés
-  const order=a=>S.ach[a.id]&&!S.claimed[a.id]?0:(!S.ach[a.id]?1:2);
-  const list=ACH.map((a,i)=>({a,i})).sort((x,y)=>order(x.a)-order(y.a)||x.i-y.i).map(o=>o.a);
-  document.getElementById("achList").innerHTML=list.map(a=>{
-    const name=S.lang==="fr"?a.fr:a.en;
-    const ready=S.ach[a.id]&&!S.claimed[a.id],done=S.claimed[a.id];
-    return '<div class="item ach '+(done?"done":"")+(ready?" ready":"")+'"><div><div class="t">'+name+'</div></div><div>'+
-      (ready?'<button data-c="'+a.id+'">'+t("claim")+' +'+a.gem+' 💎</button>':(done?"✔ ":"")+'+'+a.gem+' 💎')+'</div></div>';
-  }).join("");
-  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{claim(b.dataset.c);renderAch();update()});
-  updateBadge();
-}
-
-// ============ UI ============
-function addMoney(n){S.money+=n;S.total+=n}
-function renderUps(){
-  document.getElementById("ups").innerHTML=Object.keys(UPS).map(k=>{
-    const mx=isMax(k);
-    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
-  }).join("");
-  document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
-    const k=b.dataset.u,c=cost(k);
-    if(!isMax(k)&&S.money>=c){S.money-=c;S.ups[k]++;click();update();checkAch();save()}
-  });
-}
-function update(){
-  document.getElementById("money").textContent=fmt(S.money);
-  document.getElementById("info").textContent=fmt(perClick())+" "+t("perclick")+" • "+fmt(perSecond())+" "+t("persec");
-  document.getElementById("gems").textContent="💎 "+S.gems;
-  applySkin();renderUps();
-}
-function applyLang(){
-  document.getElementById("nGame").textContent=t("card");
-  document.getElementById("nAchT").textContent=t("ach");
-  document.getElementById("nSet").textContent=t("set");
-  document.getElementById("hUp").textContent=t("up");
-  document.getElementById("hAch").textContent=t("ach");
-  document.getElementById("hSet").textContent=t("set");
-  document.getElementById("lLang").textContent=t("lang");
-  document.getElementById("lSnd").textContent=t("snd");
-  document.getElementById("lMus").textContent=t("mus");
-  document.getElementById("lVol").textContent=t("vol");
-  document.getElementById("lRes").textContent=t("res");
-  const so=document.getElementById("sndSel").options,mo=document.getElementById("musSel").options;
-  so[0].text=mo[0].text=t("on");so[1].text=mo[1].text=t("off");
-  document.getElementById("langSel").value=S.lang;
-  document.getElementById("sndSel").value=S.snd;
-  document.getElementById("musSel").value=S.mus;
-  document.getElementById("volRange").value=S.vol;
-  renderAch();update();
+// ============ HEADER COLLANT (onglet Carte seulement) ============
+function updateStickyHeader(page){
+  document.body.classList.toggle("on-card",page==="game");
 }
 
 // ============ EVENTS ============
@@ -308,29 +280,37 @@ document.getElementById("card").addEventListener("pointerdown",e=>{
   let g=perClick(),lucky=false;
   if(Math.random()<luckyChance()){g*=5;lucky=true}
   addMoney(g);S.clicks++;click();
-  const f=document.createElement("div");f.className="float"+(lucky?" lucky":"");f.textContent="+"+fmt(g)+(lucky?" ★":"");
+  const f=document.createElement("div");
+  f.className="float"+(lucky?" lucky":"");
+  f.textContent="+"+fmt(g)+(lucky?" ★":"");
   f.style.left=(e.clientX-20)+"px";f.style.top=(e.clientY-30)+"px";
   document.body.appendChild(f);setTimeout(()=>f.remove(),900);
   update();checkAch();
 });
+
+function addMoney(v){S.money+=v;S.total+=v}
+
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");document.getElementById(b.dataset.p).classList.add("active");
+  b.classList.add("active");
+  document.getElementById(b.dataset.p).classList.add("active");
+  updateStickyHeader(b.dataset.p);
 });
+
 document.getElementById("claimAll").onclick=()=>{
   ACH.forEach(a=>claim(a.id));renderAch();update();
 };
 document.getElementById("langSel").onchange=e=>{S.lang=e.target.value;applyLang();save()};
-document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;save()};
+document.getElementById("sndSel").onchange=e=>{S.snd=+e.target.value;updateMusicVol();save()};
 document.getElementById("musSel").onchange=e=>{
   S.mus=+e.target.value;
-  if(S.mus){startMusic();}
+  if(S.mus)startMusic();
   updateMusicVol();save();
 };
 document.getElementById("volRange").oninput=e=>{S.vol=+e.target.value;updateMusicVol();save()};
 document.getElementById("resetBtn").onclick=()=>{
-  if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");localStorage.removeItem("empireTycoonV2");location.reload()}
+  if(confirm(t("confirm"))){localStorage.removeItem("empireTycoon");location.reload()}
 };
 
 // ============ LOOP ============
@@ -338,18 +318,8 @@ setInterval(()=>{const ps=perSecond();if(ps>0){addMoney(ps);update()}checkAch()}
 setInterval(save,10000);
 window.addEventListener("beforeunload",save);
 
-// ============ PAUSE MUSIQUE QUAND ON QUITTE L'ONGLET ============
-document.addEventListener("visibilitychange",()=>{
-  if(!AC)return;
-  if(document.hidden){
-    AC.suspend();
-  }else{
-    if(S.mus&&S.snd!==0)AC.resume();
-  }
-});
-
 // ============ INIT ============
-applyLang();checkAch();
+applyLang();checkAch();updateStickyHeader("game");
 </script>
 </body>
 </html>
