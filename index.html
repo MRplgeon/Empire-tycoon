@@ -12,15 +12,16 @@ header{padding:14px;text-align:center;border-bottom:1px solid #ffffff22;backgrou
 body.on-card header{position:sticky;top:0}
 #money{font-size:32px;font-weight:700;color:var(--accent);transition:color 1s}
 #info{font-size:13px;opacity:.7;margin-top:4px}
-nav{display:flex;border-bottom:1px solid #ffffff22}
-nav button{flex:1;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative}
+nav{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #ffffff22}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;min-width:33%;padding:12px;background:none;border:none;color:var(--text);font-size:14px;opacity:.6;cursor:pointer;position:relative;white-space:nowrap}
 nav button.active{opacity:1;border-bottom:2px solid var(--accent)}
 .badge{display:none;position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#e33;color:#fff;font-size:11px;font-weight:700;line-height:18px;padding:0 5px}
 .page{display:none;padding:14px;animation:fade .3s}
 .page.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 #cardWrap{display:flex;justify-content:center;margin:24px 0}
-#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s,background .6s}
+#card{width:290px;height:180px;border-radius:16px;position:relative;cursor:pointer;background:linear-gradient(135deg,var(--card1),var(--card2));box-shadow:0 10px 30px #0008,inset 0 0 0 1px #ffffff22;transition:transform .08s}
 #card:active{transform:scale(.97)}
 #card::before{content:"";position:absolute;left:20px;top:50px;width:44px;height:32px;border-radius:6px;background:linear-gradient(135deg,#e6c36a,#a8842f)}
 #card .num{position:absolute;bottom:18px;left:20px;font-size:14px;letter-spacing:3px;opacity:.7}
@@ -53,18 +54,17 @@ select option{background:#2a2a33;color:var(--text)}
   <div id="gems" style="font-size:13px;margin-top:6px">💎 0</div>
 </header>
 <nav>
-  <button data-p="ups" id="nUp"><span id="hUp">Upgrades</span></button>
   <button data-p="comp" id="nComp">Companies</button>
   <button data-p="game" class="active" id="nGame">Card</button>
   <button data-p="ach" id="nAchT"><span id="hAch">Achievements</span><span class="badge" id="badge">0</span></button>
   <button data-p="set" id="nSet">Settings</button>
 </nav>
 
-<div class="page" id="game">
+<div class="page active" id="game">
   <div id="cardWrap"><div id="card"><div class="num">•••• •••• •••• 0000</div></div></div>
+  <div class="sec" id="hUp">Upgrades</div>
+  <div id="upsList"></div>
 </div>
-
-<div class="page" id="ups"><div id="upsList"></div></div>
 
 <div class="page" id="comp">
   <div id="compList"></div>
@@ -88,10 +88,9 @@ select option{background:#2a2a33;color:var(--text)}
   <select id="skinSel"></select>
   <button id="resetBtn"></button>
 </div>
-
 <script>
 // ============ STATE ============
-const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,auto:0,tap:0,lucky:0,net:0},ach:{},claimed:{},skinChoice:0,companies:{},compLevels:{}};
+const DEF={money:0,total:0,clicks:0,gems:0,lang:"en",snd:1,mus:1,vol:30,ups:{click:0,mult:0,tap:0,lucky:0},ach:{},claimed:{},skinChoice:0,companies:{},compLevels:{}};
 let S=JSON.parse(localStorage.getItem("empireTycoon")||"null")||JSON.parse(JSON.stringify(DEF));
 for(const k in DEF){if(S[k]===undefined)S[k]=JSON.parse(JSON.stringify(DEF[k]))}
 for(const k in DEF.ups){if(S.ups[k]===undefined)S.ups[k]=0}
@@ -100,9 +99,9 @@ function save(){localStorage.setItem("empireTycoon",JSON.stringify(S))}
 // ============ TEXTES ============
 const TX={
 en:{card:"Card",comp:"Companies",ach:"Achievements",set:"Settings",up:"Upgrades",lang:"Language",snd:"Sound effects",mus:"Music",vol:"Music volume",skin:"Card skin",res:"Reset progress",confirm:"WARNING: This will PERMANENTLY erase ALL your progress (money, upgrades, achievements, skins, gems, companies and settings).\n\nClick OK to reset EVERYTHING. This cannot be undone.\n\nClick Cancel to keep your progress.",perclick:"per click",persec:"per sec",claim:"Claim",claimall:"Claim all",on:"On",off:"Off",max:"MAX",lvl:"Lvl",buy:"Buy",sell:"Sell",merge:"Merge",owned:"Owned",back:"← Back",price:"Price",income:"Income",upgrades:"Upgrades",
-u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.25 click gain",u_auto:"Auto Payments",u_autod:"+$1 per second",u_tap:"Contactless",u_tapd:"+$5 per click",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click",u_net:"Premium Network",u_netd:"+$10 per second"},
+u_click:"Better Chip",u_clickd:"+$1 per click",u_mult:"Gold Swipe",u_multd:"x1.1 click gain (max 10)",u_tap:"Contactless",u_tapd:"+$5 per click (max 30)",u_lucky:"Lucky Tap",u_luckyd:"+2% chance of a x5 click (max 25)"},
 fr:{card:"Carte",comp:"Entreprises",ach:"Succès",set:"Paramètres",up:"Améliorations",lang:"Langue",snd:"Effets sonores",mus:"Musique",vol:"Volume musique",skin:"Skin de carte",res:"Réinitialiser la progression",confirm:"ATTENTION : Cela va effacer DÉFINITIVEMENT toute ta progression (argent, améliorations, succès, skins, gemmes, entreprises et paramètres).\n\nClique sur OK pour TOUT réinitialiser. Cette action est irréversible.\n\nClique sur Annuler pour garder ta progression.",perclick:"par clic",persec:"par sec",claim:"Réclamer",claimall:"Tout réclamer",on:"Activé",off:"Désactivé",max:"MAX",lvl:"Niv",buy:"Acheter",sell:"Vendre",merge:"Fusionner",owned:"Possédées",back:"← Retour",price:"Prix",income:"Revenu",upgrades:"Améliorations",
-u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,25 gain par clic",u_auto:"Paiements auto",u_autod:"+1$ par seconde",u_tap:"Sans contact",u_tapd:"+5$ par clic",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5",u_net:"Réseau premium",u_netd:"+10$ par seconde"}
+u_click:"Meilleure puce",u_clickd:"+1$ par clic",u_mult:"Glissade dorée",u_multd:"x1,1 gain par clic (max 10)",u_tap:"Sans contact",u_tapd:"+5$ par clic (max 30)",u_lucky:"Clic chanceux",u_luckyd:"+2% de chance d'un clic x5 (max 25)"}
 };
 function t(k){return (TX[S.lang]&&TX[S.lang][k])||TX.en[k]||k}
 
@@ -115,32 +114,33 @@ const SKINS=[
   {n:"Sapphire",at:25000000,g1:"#4f8cff",g2:"#1a3f9a",bg1:"#0b1530",bg2:"#162650",acc:"#7fb0ff"},
   {n:"Diamond",at:250000000,g1:"#e6f7ff",g2:"#7fb9d9",bg1:"#101a24",bg2:"#1d2e3d",acc:"#bfe9ff"}
 ];
+
 // ============ ENTREPRISES : DONNÉES ============
 const COMPANIES=[
-  {id:"shop",en:"Corner Shop",fr:"Supérette",base:75000,g:1.15,rev:150,
+  {id:"shop",icon:"🏪",en:"Corner Shop",fr:"Supérette",base:75000,g:1.15,rev:150,
     ups:[{k:"stock",en:"Stock shelves",fr:"Rayonnages",cost:40000,inc:300,max:5},
          {k:"cam",en:"Security cameras",fr:"Caméras",cost:60000,inc:450,max:3},
          {k:"ext",en:"Extended hours",fr:"Horaires étendus",cost:90000,inc:600,max:3}]},
-  {id:"taxi",en:"Taxi Company",fr:"Compagnie de taxi",base:900000,g:1.2,rev:1500,
+  {id:"taxi",icon:"🚕",en:"Taxi Company",fr:"Compagnie de taxi",base:900000,g:1.2,rev:1500,
     ups:[{k:"veh",en:"Buy vehicles",fr:"Acheter des véhicules",cost:250000,inc:1800,max:10},
          {k:"drv",en:"Hire drivers",fr:"Embaucher des chauffeurs",cost:120000,inc:1200,max:10},
          {k:"zone",en:"Acquire city zones",fr:"Acquérir des secteurs",cost:600000,inc:4000,max:6}]},
-  {id:"carwash",en:"Car Wash",fr:"Station de lavage",base:6000000,g:1.22,rev:9000,
+  {id:"carwash",icon:"🧽",en:"Car Wash",fr:"Station de lavage",base:6000000,g:1.22,rev:9000,
     ups:[{k:"bay",en:"Add wash bays",fr:"Ajouter des bornes",cost:2000000,inc:12000,max:4},
          {k:"wax",en:"Premium wax service",fr:"Service cire premium",cost:3000000,inc:18000,max:3}]},
-  {id:"rental",en:"Car Rental",fr:"Loueur de voitures",base:20000000,g:1.22,rev:30000,
+  {id:"rental",icon:"🚗",en:"Car Rental",fr:"Loueur de voitures",base:20000000,g:1.22,rev:30000,
     ups:[{k:"fleet",en:"Expand fleet",fr:"Agrandir la flotte",cost:8000000,inc:45000,max:8},
          {k:"branch",en:"Open branches",fr:"Ouvrir des agences",cost:15000000,inc:70000,max:5}]},
-  {id:"bank",en:"Bank",fr:"Banque",base:250000000,g:1.25,rev:250000,
+  {id:"bank",icon:"🏦",en:"Bank",fr:"Banque",base:250000000,g:1.25,rev:250000,
     ups:[{k:"branch",en:"Open branches",fr:"Ouvrir des agences",cost:90000000,inc:350000,max:6},
          {k:"loan",en:"Loan department",fr:"Service prêts",cost:150000000,inc:500000,max:4}]},
-  {id:"club",en:"Football Club",fr:"Club de football",base:1500000000,g:1.3,rev:1200000,
+  {id:"club",icon:"⚽",en:"Football Club",fr:"Club de football",base:1500000000,g:1.3,rev:1200000,
     ups:[{k:"stad",en:"Stadium upgrade",fr:"Rénover le stade",cost:600000000,inc:2000000,max:4},
          {k:"player",en:"Sign players",fr:"Recruter des joueurs",cost:800000000,inc:3000000,max:8}]},
-  {id:"oil",en:"Oil Station",fr:"Station pétrolière",base:8000000000,g:1.3,rev:6000000,
+  {id:"oil",icon:"🛢️",en:"Oil Station",fr:"Station pétrolière",base:8000000000,g:1.3,rev:6000000,
     ups:[{k:"rig",en:"Drill rigs",fr:"Forages",cost:3000000000,inc:9000000,max:6},
          {k:"refine",en:"Refineries",fr:"Raffineries",cost:5000000000,inc:14000000,max:4}]},
-  {id:"space",en:"Space Company",fr:"Entreprise spatiale",base:60000000000,g:1.35,rev:40000000,
+  {id:"space",icon:"🚀",en:"Space Company",fr:"Entreprise spatiale",base:60000000000,g:1.35,rev:40000000,
     ups:[{k:"sat",en:"Launch satellites",fr:"Lancer des satellites",cost:20000000000,inc:60000000,max:6},
          {k:"base",en:"Build orbital base",fr:"Base orbitale",cost:40000000000,inc:90000000,max:3}]}
 ];
@@ -191,7 +191,7 @@ function renderCompanies(){
   if(openComp===null){
     list.innerHTML=COMPANIES.map((c,i)=>{
       const name=S.lang==="fr"?c.fr:c.en;
-      return '<div class="comp-card" data-open="'+i+'"><div class="t">'+name+'</div><div class="d">'+t("owned")+': '+compCount(c.id)+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div>';
+      return '<div class="comp-card" data-open="'+i+'"><div class="t">'+c.icon+' '+name+'</div><div class="d">'+t("owned")+': '+compCount(c.id)+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div>';
     }).join("");
     list.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{openComp=+el.dataset.open;renderCompanies()});
     return;
@@ -200,11 +200,11 @@ function renderCompanies(){
   const price=buyPrice(c),n=compCount(c.id);
   const next=COMPANIES[idx+1];
   let h='<button class="back" data-back="1">'+t("back")+'</button>';
-  h+='<div class="item"><div><div class="t">'+name+'</div><div class="d">'+t("owned")+': '+n+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div></div>';
+  h+='<div class="item"><div><div class="t">'+c.icon+' '+name+'</div><div class="d">'+t("owned")+': '+n+' • '+t("income")+': '+fmt(compRev(c))+' '+t("persec")+'</div></div></div>';
   h+='<div class="item"><div><div class="t">'+t("buy")+'</div><div class="d">'+t("price")+': '+fmt(price)+'</div></div><button data-buy="1" '+(S.money<price?"disabled":"")+'>'+t("buy")+'</button></div>';
   if(next){
     const ok=n>=MERGE_NEED;
-    h+='<div class="item"><div><div class="t">'+t("merge")+' → '+(S.lang==="fr"?next.fr:next.en)+'</div><div class="d">'+MERGE_NEED+' × '+name+'</div></div><button data-merge="1" '+(ok?"":"disabled")+'>'+t("merge")+'</button></div>';
+    h+='<div class="item"><div><div class="t">'+t("merge")+' → '+next.icon+' '+(S.lang==="fr"?next.fr:next.en)+'</div><div class="d">'+MERGE_NEED+' × '+name+'</div></div><button data-merge="1" '+(ok?"":"disabled")+'>'+t("merge")+'</button></div>';
   }
   h+='<div class="sec">'+t("upgrades")+'</div>';
   c.ups.forEach(u=>{
@@ -222,19 +222,18 @@ function renderCompanies(){
     const u=c.ups.find(x=>x.k===b.dataset.cu);buyCompUp(c,u);
   });
 }
-// ============ UPGRADES ============
+
+// ============ UPGRADES DE LA CARTE (manuel uniquement, plafonnées) ============
 const UPS={
-click:{base:15,g:1.35,key:"u_click"},
-auto:{base:60,g:1.4,key:"u_auto"},
-tap:{base:400,g:1.45,key:"u_tap"},
-mult:{base:900,g:2.1,key:"u_mult"},
-lucky:{base:2500,g:1.6,key:"u_lucky",max:25},
-net:{base:3500,g:1.5,key:"u_net"}
+click:{base:12,g:1.3,key:"u_click",max:50},
+mult:{base:600,g:1.9,key:"u_mult",max:10},
+tap:{base:300,g:1.4,key:"u_tap",max:30},
+lucky:{base:2000,g:1.6,key:"u_lucky",max:25}
 };
 function cost(k){return Math.floor(UPS[k].base*Math.pow(UPS[k].g,S.ups[k]))}
 function isMax(k){return UPS[k].max&&S.ups[k]>=UPS[k].max}
-function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.25,S.ups.mult)}
-function perSecond(){return S.ups.auto+10*S.ups.net+companyRev()}
+function perClick(){return (1+S.ups.click+5*S.ups.tap)*Math.pow(1.1,S.ups.mult)}
+function perSecond(){return companyRev()}
 function luckyChance(){return Math.min(0.5,S.ups.lucky*0.02)}
 
 // ============ FORMAT ============
@@ -330,9 +329,7 @@ const ACH=[];
   ACH.push({id:"c"+v,en:"Click "+v+" times",fr:"Cliquer "+v+" fois",gem:1+i,test:()=>S.clicks>=v}));
 ACH.push({id:"um5",en:"Gold Swipe",fr:"Glissade dorée",gem:3,test:()=>S.ups.mult>=1});
 ACH.push({id:"ul10",en:"Lucky Tap",fr:"Clic chanceux",gem:3,test:()=>S.ups.lucky>=1});
-ACH.push({id:"un5",en:"Premium Network",fr:"Réseau premium",gem:3,test:()=>S.ups.net>=1});
 ACH.push({id:"ut5",en:"Contactless",fr:"Sans contact",gem:2,test:()=>S.ups.tap>=1});
-ACH.push({id:"ua5",en:"Auto Payments",fr:"Paiements auto",gem:2,test:()=>S.ups.auto>=1});
 ACH.push({id:"uc5",en:"Better Chip",fr:"Meilleure puce",gem:2,test:()=>S.ups.click>=1});
 COMPANIES.forEach((c,i)=>{
   ACH.push({id:"co"+c.id,en:"Own a "+c.en,fr:"Posséder : "+c.fr,gem:2+Math.min(i,4),test:()=>compCount(c.id)>=1});
@@ -379,10 +376,7 @@ function renderAch(){
 }
 
 // ============ SKIN ============
-function currentSkin(){
-  const s=SKINS[S.skinChoice]||SKINS[0];
-  return s;
-}
+function currentSkin(){return SKINS[S.skinChoice]||SKINS[0]}
 function renderSkinSel(){
   const sel=document.getElementById("skinSel");
   const avail=SKINS.map((s,i)=>({s,i})).filter(o=>o.i===0||S.claimed["skin"+o.i]);
@@ -390,10 +384,10 @@ function renderSkinSel(){
   sel.value=S.skinChoice;
 }
 function applySkin(){
-  const s=currentSkin(),c=document.getElementById("card");
-  c.style.background="linear-gradient(135deg,"+s.g1+","+s.g2+")";
-  document.body.style.background="linear-gradient(160deg,"+s.bg1+","+s.bg2+")";
-  document.getElementById("money").style.color=s.acc;
+  const s=currentSkin(),r=document.documentElement.style;
+  r.setProperty("--card1",s.g1);r.setProperty("--card2",s.g2);
+  r.setProperty("--bg1",s.bg1);r.setProperty("--bg2",s.bg2);r.setProperty("--accent",s.acc);
+  document.body.style.background="linear-gradient(160deg,var(--bg1),var(--bg2))";
 }
 
 // ============ UI ============
@@ -401,7 +395,7 @@ function addMoney(n){S.money+=n;S.total+=n}
 function renderUps(){
   document.getElementById("upsList").innerHTML=Object.keys(UPS).map(k=>{
     const mx=isMax(k);
-    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
+    return '<div class="item"><div><div class="t">'+t(UPS[k].key)+' <small>('+t("lvl")+' '+S.ups[k]+'/'+UPS[k].max+')</small></div><div class="d">'+t(UPS[k].key+"d")+'</div></div><button data-u="'+k+'" '+(mx||S.money<cost(k)?"disabled":"")+'>'+(mx?t("max"):fmt(cost(k)))+'</button></div>';
   }).join("");
   document.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{
     const k=b.dataset.u,c=cost(k);
